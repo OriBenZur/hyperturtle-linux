@@ -8906,7 +8906,7 @@ int kvm_emulate_hypercall(struct kvm_vcpu *vcpu)
 		a3 &= 0xFFFFFFFF;
 	}
 
-	if (static_call(kvm_x86_get_cpl)(vcpu) == 1000) {
+	if (static_call(kvm_x86_get_cpl)(vcpu) == 1234) {
 		ret = -KVM_EPERM;
 		goto out;
 	}
@@ -8914,10 +8914,31 @@ int kvm_emulate_hypercall(struct kvm_vcpu *vcpu)
 	ret = -KVM_ENOSYS;
 
 	switch (nr) {
-	case 13:
-		printk("Hello hypercall!\n");
-		ret = 0;
-		break;
+	case 13: { // Load hyperupcall
+		u64 binary = a0, program_len = a1, major_id = a2, minor_id = a3;
+		
+		vcpu->run->exit_reason = KVM_EXIT_HYPERCALL;
+		vcpu->run->hypercall.nr       = nr;
+		vcpu->run->hypercall.args[0]  = binary;
+		vcpu->run->hypercall.args[1]  = program_len;
+		vcpu->run->hypercall.args[2]  = major_id;
+		vcpu->run->hypercall.args[3]  = minor_id;
+		// printk("Hello hypercall! %lu %llu %llu %llu\n", nr, binary, major_id, minor_id);
+
+		vcpu->arch.complete_userspace_io = complete_hypercall_exit;
+		return 0;
+	}
+	case 14: { // Unload hyperupcall
+		u64 major_id = a0, minor_id = a1;
+		
+		vcpu->run->exit_reason = KVM_EXIT_HYPERCALL;
+		vcpu->run->hypercall.nr       = nr;
+		vcpu->run->hypercall.args[0]  = major_id;
+		vcpu->run->hypercall.args[1]  = minor_id;
+
+		vcpu->arch.complete_userspace_io = complete_hypercall_exit;
+		return 0;
+	}
 	case KVM_HC_VAPIC_POLL_IRQ:
 		ret = 0;
 		break;
@@ -12616,6 +12637,50 @@ int kvm_sev_es_string_io(struct kvm_vcpu *vcpu, unsigned int size,
 		  : kvm_sev_es_outs(vcpu, size, port);
 }
 EXPORT_SYMBOL_GPL(kvm_sev_es_string_io);
+
+
+#define HUC_NETWORK_HOOK 1
+
+/* Called by guest via hypercall */
+// int load_hyperupcall(struct kvm_vcpu *vcpu, union bpf_attr *attr, unsigned int major_hook, unsigned int minor_hook) {
+// 	struct kvm *kvm = vcpu->kvm;
+// 	int ret;
+// 	if (size == 0 || size % PAGE_SIZE != 0) {
+// 		pr_err("got invalid hyperupcall size %d\n", size);
+// 		return -1;
+// 	}
+// 	ret = kvm_vcpu_read_guest(vcpu, addr, kvm->arch.hyperupcall, size);
+// 	if (ret < 0) {
+// 		pr_err("Failed to read hyperupcall from guest\n");
+// 		return ret;
+// 	}
+// 	switch(major_hook) {
+// 		case HUC_NETWORK_HOOK:
+
+// 	}
+// 	return 0;
+// }
+
+
+/* Called by guest via hypercall */
+int map_bpf_array_to_guest(struct kvm_vcpu *vcpu, char *bpf_obj_name, int map_id, long addr, size_t size) { 
+	// struct kvm *kvm = vcpu->kvm;
+	// char obj_name_host[1024];
+	// int ret;
+	// if (size == 0 || size % PAGE_SIZE != 0) {
+	// 	pr_err("got invalid map name size %d\n", size);
+	// 	return -1;
+	// }
+	// ret = kvm_vcpu_read_guest(vcpu, bpf_obj_name, map_name_host, map_name_len);
+	// if (ret < 0) {
+	// 	pr_err("Failed to read map_name from guest\n");
+	// 	return ret;
+	// }
+
+
+    // pr_info("shared_bpf_map_addr: %lx, shared_bpf_map_size: %lx\n", addr, size);
+	return 0;
+}
 
 EXPORT_TRACEPOINT_SYMBOL_GPL(kvm_entry);
 EXPORT_TRACEPOINT_SYMBOL_GPL(kvm_exit);
