@@ -1,0 +1,15 @@
+#type       avg     std     min      p5     p10     p50     p67     p75     p80     p85     p90     p95     p99    p999   p9999
+read      340.6   104.4    54.7   166.4   201.8   341.4   381.9   404.6   424.7   447.6   476.3   517.8   591.9   711.1   929.7
+update    344.9   113.3    59.1   171.5   210.8   343.7   384.0   406.5   425.1   447.6   478.3   517.1   591.7   779.8  2709.8
+op_q        1.0     0.0     1.0     1.0     1.0     1.0     1.1     1.1     1.1     1.1     1.1     1.1     1.1     1.1     1.1
+
+Total QPS = 3972.2 (23833 / 6.0s)
+
+Total connections = 120
+Misses = 0 (0.0%)
+Skipped TXs = 0 (0.0%)
+
+RX    4658631 bytes :    0.7 MB/s
+TX    1507073 bytes :    0.2 MB/s
+Saving latency samples to nested_virt_results1.
+CPU Usage Stats (avg/min/max): 28.33%,28.28%,28.33%

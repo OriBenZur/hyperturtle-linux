@@ -1,0 +1,323 @@
+#!/bin/bash
+
+CUR_USR=$USER
+
+if [ "$EUID" -eq 0 ]
+then
+    CUR_USR=$SUDO_USER
+fi
+
+
+USAGE="Usage: `basename $0` -i IMAGE_FILE [-k BZIMAGE] [-b] [-g] [-c <num_cpus>] [-m <mem>]
+where:
+    -b              run with 2MiB huge pages
+    -g              run with 1GiB huge pages
+    -c <num_cpus>   specify num cpus
+    -m <mem>        memory in GiB"
+
+MEM_SIZE=16
+NUM_CPUS=4
+
+# Opts
+OPT_HUGE=0
+EPT_CPU_FLAG="" # -vmx-ept
+IMAGE=
+PASSTHROUGH_DEVS=0
+N_PASSTHROUGH_DEVICES=0
+BZIMAGE=
+KERNEL=
+REDIRECT="mon:stdio"
+SSH_PORT=2222
+QMP_PORT=4444
+SSH_FORWARD=2223
+GDB_PORT=1234
+QEMU_DIR="/mnt/bigdisk/ori/nestedTPT_measurements/qemu-7.2.0-rc2/build"
+SHARED_DIR_PATH="/home/ori/nestedTPT_measurements"
+GUEST_IP="172.19.0.2"
+ENO2_IP="132.68.52.130"
+PCI_ROOT_PORT=
+
+while getopts ghbm:c:i:k:s:o:f:q:S:H:r:Q:P: opt; do
+    case $opt in
+        h)
+            printf "$USAGE\n" >&2
+            exit 0
+            ;;
+        b)
+            OPT_HUGE=1              #For 2MiB huge pages
+            ;;
+        g)
+            OPT_HUGE=2              #For 1GiB huge pages
+            ;;
+        c)
+            NUM_CPUS=$((${OPTARG})) #Number of CPUs
+            ;;
+        m)
+            MEM_SIZE=$((${OPTARG})) #Mem size
+            ;;
+        i)
+            IMAGE=$OPTARG           #Image to run
+            ;;
+        k)
+            BZIMAGE=$OPTARG         #kernel BZimage
+            ;;
+        s)
+            SCRIPT=$OPTARG          #Script for guest
+            ;;
+        o)
+            OUTPUT_FILE=$OPTARG     #Output file
+            ;;
+        f)
+            SHARED_DIR_PATH=$OPTARG
+            ;;
+        q)
+            QMP_PORT=$OPTARG
+            ;;
+        S)
+            SSH_PORT=$OPTARG     #Port that is forwarded to the guest's 22
+            ;;
+        H)
+            SSH_FORWARD=$OPTARG
+            ;;
+        r)
+            REDIRECT=$OPTARG
+            ;;
+        G)
+            GDB_PORT=$OPTARG
+            ;;
+        Q)
+            QEMU_DIR=$OPTARG
+            ;;
+        P)
+            PASSTHROUGH_DEVS=$OPTARG
+            ;;
+       \?)
+            # getopts issues an error message
+            printf "$USAGE\n" >&2
+            exit 1
+            ;;
+    esac
+done
+
+if [ -z $IMAGE ]
+then
+    echo "Please supply image: -i <my-image.img>"
+    exit
+fi
+
+if [ ! -z $BZIMAGE ]
+then
+    KERNEL="-kernel $BZIMAGE" # -initrd initrd.img-5.16.0+"
+    APPEND=('-append' "nokaslr norandmaps root=/dev/vda1 console=ttyS0 earlyprintk=serial,ttyS0 ignore_loglevel printk_delay=0 systemd.unified_cgroup_hierarchy=1 nopku nokaslr noibrs noibpb nopti nospectre_v1 nospectre_v2 no_spectre_v2_user no_stf_barrier l1tf=off mds=off tsx=off tsx_async_abort=off idle=poll intel_iommu=on transparent_hugepages=never no-kvmapf nohz_full=1-$(($NUM_CPUS - 1)) ") #rcu_nocbs=1-$(($NUM_CPUS - 1))
+fi
+
+if [ ! -z $SCRIPT ]
+then
+    APPEND+=(" < $SCRIPT")
+fi
+
+if [ ! -z $OUTPUT_FILE ]
+then
+    APPEND+=(" > $OUTPUT_FILE " " 2> $OUTPUT_FILE ")
+fi
+
+is_virtualized=$(sudo dmesg | grep "Hypervisor detected" | wc -l)
+# is_virtualized=1
+
+PREALLOC='on'
+if [ $is_virtualized -eq "1" ]; then
+    PREALLOC='off'
+fi
+
+# Init for Qemu
+echo never | sudo tee /sys/kernel/mm/transparent_hugepage/enabled
+MEMORY="-object memory-backend-ram,size=${MEM_SIZE}G,merge=off,prealloc=$PREALLOC,id=m0"
+
+# Free old huge pages if there are any
+echo 0 | sudo tee /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages
+echo 0 | sudo tee /sys/devices/system/node/node0/hugepages/hugepages-1048576kB/nr_hugepages
+
+sudo umount /hugepages
+
+if (( $OPT_HUGE != 0 )); then
+    MEMORY="-object memory-backend-file,size=${MEM_SIZE}G,merge=off,mem-path=/hugepages,prealloc=on,id=m0"
+    sudo mkdir /hugepages   
+	if (( $OPT_HUGE == 2 )); then
+		echo "run huge memory 1G"
+		NUM_HUGE=$((${MEM_SIZE}))
+		echo $NUM_HUGE | sudo tee /sys/devices/system/node/node0/hugepages/hugepages-1048576kB/nr_hugepages
+		sudo mount -t hugetlbfs -o pagesize=1G none /hugepages
+	else
+		echo "run huge memory 2M"
+		NUM_HUGE=$(((${MEM_SIZE} * 1024)/2))
+		echo $NUM_HUGE | sudo tee /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages
+		sudo mount -t hugetlbfs -o pagesize=2M none /hugepages
+	fi
+    sudo chown -R $CUR_USR:$CUR_USR /hugepages
+fi
+
+NUM_CPUS_MAX_STR="-$(( $NUM_CPUS - 1 ))"
+
+(
+    sleep 10
+
+    CUR_CPU=$(($NUM_CPUS + 1))
+    for pid in $(pgrep vhost); do sudo taskset --all-tasks -cp $CUR_CPU $pid; done
+    
+    i=0; for pid in $(pgrep -w qemu | tac); do sudo taskset -cp $((($i % $N_VCPUS) + 1)) $pid; i=$(($i + 1)); done
+        # echo "sudo taskset -cp $((($i % $N_VCPUS) + 1)) $pid"
+        
+    
+    echo "PINNED VHOST + QEMU CPUS"
+)& 
+
+# set_cores & 
+
+# Setup tap interface
+# ifconfig eno2 0.0.0.0
+# brctl addbr br0
+# brctl addif br0 eno2
+# ifconfig br0 $ENO2_IP netmask 255.255.255.0
+
+# ip addr flush dev eno2
+# ifconfig br0 $ENO2_IP netmask 255.255.248.0
+# ifconfig eno2 0.0.0.0
+# brctl addif br0 eno2
+# tunctl -t tap0 -u `whoami`
+# ifconfig tap0 0.0.0.0 up
+# brctl addif br0 tap0
+# inet 172.19.0.1  netmask 255.255.0.0  broadcast 172.19.255.255
+# 132.68.52.133  netmask 255.255.255.128  broadcast 132.68.52.255
+
+forward_port () {
+    host_port=$1
+    guest_port=$2
+    sudo iptables -t nat -A PREROUTING  -p tcp --dport $host_port -j DNAT --to $GUEST_IP:$guest_port # change port 2222 to 22
+    sudo iptables -A FORWARD ! -i br0 -o br0 -p tcp -d $GUEST_IP --dport $guest_port -j ACCEPT # Allow traffic from outside to br0 port 22
+}
+
+dforward_port () {
+    host_port=$1
+    guest_port=$2
+    sudo iptables -t nat -D PREROUTING  -p tcp --dport $host_port -j DNAT --to $GUEST_IP:$guest_port # change port 2222 to 22
+    sudo iptables -D FORWARD ! -i br0 -o br0 -p tcp -d $GUEST_IP --dport $guest_port -j ACCEPT # Allow traffic from outside to br0 port 22
+}
+
+
+
+# sudo modprobe vhost_iotlb
+# if [ -e "vhost.ko" ] && [ -e "vhost_net.ko" ] \
+#     && [ "$(basename "$PWD")" == "shared_folder" ]; then
+#     sudo rmmod vhost_net
+#     sudo rmmod vhost
+#     sudo insmod ./vhost.ko
+#     sudo insmod ./vhost_net.ko experimental_zcopytx=1
+# fi
+
+
+
+if [ $is_virtualized -eq "0" ] && [ $PASSTHROUGH_DEVS -ge "0" ]; then
+    for ((i = 0; i < 31; i++)); do sudo cpufreq-set -c $i -d 2.1GHz -u 2.1GHz; done
+    NET="$NET -device virtio-net-pci,mq=on,netdev=net0,mrg_rxbuf=on,rx_queue_size=256,tx_queue_size=256 -netdev tap,id=net0,vhost=on,ifname=tap0,script=no,downscript=no,br=virbr0"
+    if ! ifconfig | grep -q "tap0"; then sudo ip tuntap add dev tap0 mode tap && sudo brctl addif virbr0 tap0 && sudo ifconfig tap0 up; fi
+fi
+
+if [ $is_virtualized -eq "1" ] && \
+    [ $PASSTHROUGH_DEVS -gt "0" ]; then
+    sudo modprobe -v vfio-pci
+    sudo modprobe -v vfio_iommu_type1
+    BDF_V=`lspci | grep 0$PASSTHROUGH_DEVS:00.0 | tail -n 1 | awk '{ print $1 }'`
+    DEV_ID=`lspci -nn | grep $BDF_V | cut -d[ -f3 | cut -d] -f1 | sed 's/:/ /'`
+    BDF_V=0000:$BDF_V
+    echo $BDF_V > /sys/bus/pci/devices/$BDF_V/driver/unbind
+    echo $DEV_ID  > /sys/bus/pci/drivers/vfio-pci/new_id
+    NET="-device vfio-pci,host=$BDF_V,id=net2 -nic none"
+elif [ $is_virtualized -eq "1" ] && \
+     [ $PASSTHROUGH_DEVS -eq "0" ]; then
+    if ! ifconfig | grep -q "tap0"; then sudo ip tuntap add dev tap0 mode tap && sudo brctl addif virbr0 tap0 && sudo ifconfig tap0 up; fi
+    NET="-device virtio-net-pci,mq=on,netdev=net2,mac="52:54:00:12:34:59",mrg_rxbuf=on,rx_queue_size=256,tx_queue_size=256 -netdev tap,id=net2,vhost=on,ifname=tap0,script=no,downscript=no,br=virbr0"
+elif [ $is_virtualized -eq "0" ] && \
+    [ $PASSTHROUGH_DEVS -ge "0" ]; then
+    vIOMMU="-device intel-iommu,intremap=on,device-iotlb=true,caching-mode=on"
+    N_PASSTHROUGH_DEVICES=$(( $PASSTHROUGH_DEVS + 1 ))
+    for ((i = 1; i < $N_PASSTHROUGH_DEVICES; i++)); do
+        if ! ifconfig | grep -q "tap$i"; then sudo ip tuntap add dev tap$i mode tap && sudo brctl addif virbr0 tap$i && sudo ifconfig tap$i up; fi
+        PCI_ROOT_PORT="$PCI_ROOT_PORT -device pcie-root-port,id=rp$i,chassis=$i,bus=pcie.0,slot=$i"
+        NET="$NET -device virtio-net-pci,mq=on,netdev=net$i,disable-legacy=on,disable-modern=off,iommu_platform=on,ats=on,bus=rp$i,iommu_platform=on,mrg_rxbuf=on,rx_queue_size=256,tx_queue_size=256 -netdev tap,id=net$i,vhost=on,ifname=tap$i,script=no,downscript=no,br=virbr0"
+    done
+    # NET="$NET -device vfio-pci,host=86:00.1,multifunction=on"
+    # NET="$NET -device vfio-pci,host=86:00.2,multifunction=on"
+elif [ $is_virtualized -eq "0" ] && \
+    [ $PASSTHROUGH_DEVS -eq "0" ]; then
+    NET="$NET -device virtio-net-pci,mq=on,netdev=net1,mrg_rxbuf=on,rx_queue_size=256,tx_queue_size=256 -netdev tap,id=net1,vhost=on,ifname=tap1,script=no,downscript=no,br=virbr0"
+    # NET="-device virtio-net-pci,mq=on,netdev=net0,mrg_rxbuf=on,rx_queue_size=256,tx_queue_size=256 -netdev user,id=net0,hostfwd=tcp:0.0.0.0:${SSH_PORT}-:22,hostfwd=tcp:0.0.0.0:${SSH_FORWARD}-:${SSH_PORT},hostfwd=tcp:0.0.0.0:11211-:11211"
+else NET="-netdev user,id=net0,hostfwd=tcp:0.0.0.0:2222-:22 -device e1000,netdev=net0"
+fi
+
+ROOT_PORT_FINAL_SLOT=$(( 2 * $N_PASSTHROUGH_DEVICES ))
+HYPERUPCALL_ROOT_PORTS=
+for ((i = N_PASSTHROUGH_DEVICES; i < $ROOT_PORT_FINAL_SLOT; i++)); do
+    HYPERUPCALL_ROOT_PORTS="$HYPERUPCALL_ROOT_PORTS -device pcie-root-port,id=hp$(($i - $N_PASSTHROUGH_DEVICES)),chassis=$i,bus=pcie.0,slot=$i,hotplug=true"
+done
+
+STRACE="sudo strace -o strace_output"
+STRACE=
+QMP="-qmp tcp:localhost:${QMP_PORT},server,nowait"
+# Use port 2223 for ssh from L1 to L2
+# forward_port 2222 22
+# forward_port 11211 11211
+
+sudo numactl --physcpubind 1-$NUM_CPUS --membind 0 \
+$STRACE sudo $QEMU_DIR/qemu-system-x86_64 -gdb tcp::$GDB_PORT -name debug-threads=on \
+-serial $REDIRECT \
+-m ${MEM_SIZE}G \
+-nographic \
+-machine q35,accel=kvm,kernel-irqchip=split \
+-cpu host,migratable=no,pmu=on,+tsc,+tsc-deadline,+rdtscp,+invtsc,+monitor \
+$MEMORY \
+$PCI_ROOT_PORT $NET $vIOMMU  \
+$SHARED_MEM \
+-drive file=$IMAGE,if=virtio,format=qcow2 \
+-smp ${NUM_CPUS},sockets=1 \
+-numa node,nodeid=0,cpus=0${NUM_CPUS_MAX_STR},memdev=m0 \
+-rtc clock=host \
+$QMP \
+-virtfs local,path=$SHARED_DIR_PATH,mount_tag=hostshare,security_model=none,id=hostshare \
+-chardev socket,path="/tmp/qga.sock",server=on,wait=off,id=qga0 \
+-device virtio-serial \
+$HYPERUPCALL_ROOT_PORTS \
+-device virtserialport,chardev=qga0,name=org.qemu.guest_agent.0 \
+-L /usr/share/seabios/ \
+$KERNEL \
+"${APPEND[@]}"
+
+if [ $is_virtualized -eq "1" ] && [ $PASSTHROUGH_DEVS -eq "1" ]; then
+    echo $BDF_V > /sys/bus/pci/devices/$BDF_V/driver/unbind
+    echo $DEV_ID  > /sys/bus/pci/drivers/vfio-pci/remove_id
+    echo $BDF_V > /sys/bus/pci/drivers/virtio-pci/bind
+# elif [ $is_virtualized -ne "1" ]; then
+    # for ((i = 0; i < $NUM_CPUS; i++)); do sudo cpufreq-set -c $i -d 800MHz -u 2.1GHz ; done
+fi
+
+# -device virtio-net-pci,mq=on,netdev=net0, mrg_rxbuf=on,rx_queue_size=256,tx_queue_size=256 \
+# -netdev tap,id=net0,vhost=on,helper=/usr/local/libexec/qemu-bridge-helper \
+# dforward_port 2222 22
+# dforward_port 11211 11211
+# brctl delif br0 eno2
+# brctl delif br0 tap0
+# ifconfig br0 down
+# ip addr flush dev br0
+# ifconfig eno2 up $ENO2_IP
+# -vnc localhost:5901 \
+
+
+# -enable-kvm -cpu host,migratable=no,+monitor \
+# -enable-kvm -cpu host,migratable=no,+tsc,+tsc-deadline,+rdtscp,+invtsc,+monitor \
+
+# sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE # Masquerade all outgoing traffic through eth0 as if it was eth0
+# sudo iptables -A INPUT -i br0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT # Allow ongoing traffic from br0 to outside
+# sudo iptables -A INPUT -i br0 -j ACCEPT # Allow new traffic from br0 to outside
+# sudo iptables -A FORWARD -i br0 ! -o br0 -j ACCEPT 
+# sudo iptables -A FORWARD -i br0 -o br0 -j ACCEPT # Allow traffic between br0 and itself
+
+# Allow traffic from br0 port

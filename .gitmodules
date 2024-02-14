@@ -1,0 +1,25 @@
+[submodule "gups"]
+	path = gups
+	url = git@github.com:OriBenZur/gups.git
+[submodule "kata_containers_benchmarks/memcache-perf"]
+	path = kata_containers_benchmarks/memcache-perf
+	url = git@github.com:shaygalon/memcache-perf
+[submodule "bcc"]
+	path = bcc
+	url = https://github.com/iovisor/bcc.git
+[submodule "bmc-cache"]
+	path = bmc-cache
+	url = https://github.com/Orange-OpenSource/bmc-cache.git
+
+[submodule "scripts"]
+	path = scripts
+	url = git@github.com:OriBenZur/hyperupcalls_scripts.git
+[submodule "libbpf"]
+	path = libbpf
+	url = https://github.com/libbpf/libbpf.git
+[submodule "pipework"]
+	path = pipework
+	url = https://github.com/jpetazzo/pipework.git
+[submodule "hyperupcalls_scripts"]
+	path = hyperupcalls_scripts
+	url = git@github.com:OriBenZur/hyperupcalls_scripts.git

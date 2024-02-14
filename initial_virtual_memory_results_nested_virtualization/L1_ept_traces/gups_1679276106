@@ -1,0 +1,18 @@
+# started on Mon Mar 20 01:35:07 2023
+
+
+ Performance counter stats for process id '352123':
+
+         6,561,999      kvm:kvm_entry                                               
+         6,561,992      kvm:kvm_exit                                                
+                 0      kvm:kvm_nested_vmexit                                       
+                 0      kvm:kvm_nested_vmrun                                        
+ 3,732,158,000,398      cycles:G                                                    
+    53,966,106,213      cycles:H                                                    
+   224,548,068,111      instructions:G            #    0.06  insn per cycle         
+    58,991,926,436      instructions:H            #    1.09  insn per cycle         
+         4,988,253      kvm:kvm_page_fault                                          
+         4,988,241      kvm:kvm_page_fault                                          
+
+     284.299315638 seconds time elapsed
+

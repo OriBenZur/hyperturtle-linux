@@ -1,0 +1,18 @@
+# started on Mon Mar 20 20:47:54 2023
+
+
+ Performance counter stats for process id '2871':
+
+           6492998      kvm:kvm_entry                                               
+           6493001      kvm:kvm_exit                                                
+                 0      kvm:kvm_nested_vmexit                                       
+                 0      kvm:kvm_nested_vmrun                                        
+       93092169636      cycles:G                                                    
+      126276462774      cycles:H                                                    
+       60863501909      instructions:G            #    0.65  insn per cycle         
+       63124046749      instructions:H            #    0.50  insn per cycle         
+           5775934      kvm:kvm_page_fault                                          
+           5775934      kvm:kvm_page_fault                                          
+
+     318.211230227 seconds time elapsed
+

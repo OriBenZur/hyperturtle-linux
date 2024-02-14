@@ -1,0 +1,18 @@
+# started on Tue Mar 21 01:11:15 2023
+
+
+ Performance counter stats for process id '4614':
+
+          17501993      kvm:kvm_entry                                               
+          17501995      kvm:kvm_exit                                                
+                 0      kvm:kvm_nested_vmexit                                       
+                 0      kvm:kvm_nested_vmrun                                        
+      124211679247      cycles:G                                                    
+      375966740248      cycles:H                                                    
+       62316449090      instructions:G            #    0.50  insn per cycle         
+      159826516804      instructions:H            #    0.43  insn per cycle         
+          15967865      kvm:kvm_page_fault                                          
+          15967865      kvm:kvm_page_fault                                          
+
+     849.717296285 seconds time elapsed
+

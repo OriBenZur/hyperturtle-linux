@@ -1,0 +1,19 @@
+# started on Mon Feb 27 07:54:33 2023
+
+
+ Performance counter stats for './run_virt_host -i ../qemu_rampup/qcow_images/pc.qcow2':
+
+    30,638,235,216      kvm:kvm_entry                                               
+    30,638,235,216      kvm:kvm_exit                                                
+     5,988,324,425      kvm:kvm_nested_vmexit                                       
+                 0      kvm:kvm_nested_vmrun                                        
+554,394,589,059,239      cycles:G                                                    
+227,943,009,074,771      cycles:H                                                    
+       348,819,056      kvm:kvm_page_fault                                          
+
+  170826.826504471 seconds time elapsed
+
+       0.074087000 seconds user
+       0.060614000 seconds sys
+
+

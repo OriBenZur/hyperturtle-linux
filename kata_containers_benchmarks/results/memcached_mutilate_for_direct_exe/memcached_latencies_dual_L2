@@ -1,0 +1,30 @@
+#type       avg     std     min      p5     p10     p50     p67     p75     p80     p85     p90     p95     p99    p999   p9999
+read      462.9   208.5    74.4   182.3   237.9   392.5   575.0   637.9   675.2   716.1   764.9   834.8   942.1  1077.6  1239.2
+update    465.1   203.5    74.4   186.0   241.7   400.1   576.0   632.7   670.9   711.7   755.1   813.3   940.3  1075.4  1097.9
+op_q        1.0     0.0     1.0     1.0     1.0     1.0     1.1     1.1     1.1     1.1     1.1     1.1     1.1     1.1     1.1
+
+Total QPS = 2067.3 (12404 / 6.0s)
+
+Total connections = 120
+Misses = 0 (0.0%)
+Skipped TXs = 0 (0.0%)
+
+RX    2351581 bytes :    0.4 MB/s
+TX     745673 bytes :    0.1 MB/s
+Saving latency samples to nested_virt_results2.
+#type       avg     std     min      p5     p10     p50     p67     p75     p80     p85     p90     p95     p99    p999   p9999
+read      506.8   221.1    63.8   192.4   247.6   493.0   624.6   675.2   712.5   755.7   806.7   883.1  1015.1  1183.8  1355.1
+update    509.0   218.9    68.9   196.2   254.3   494.3   625.9   675.9   710.1   748.5   803.7   874.7  1023.7  1263.2  1370.5
+op_q        1.0     0.0     1.0     1.0     1.0     1.0     1.1     1.1     1.1     1.1     1.1     1.1     1.1     1.1     1.1
+
+Total QPS = 2029.5 (12177 / 6.0s)
+
+Total connections = 120
+Misses = 0 (0.0%)
+Skipped TXs = 0 (0.0%)
+
+RX    2057884 bytes :    0.3 MB/s
+TX     689034 bytes :    0.1 MB/s
+Saving latency samples to nested_virt_results1.
+CPU Usage Stats (avg/min/max): 50.32%,50.25%,50.36%
+CPU Usage Stats (avg/min/max): 50.29%,50.25%,50.35%

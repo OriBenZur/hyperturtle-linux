@@ -1,0 +1,220 @@
+SCALE: 25
+nvtx: 33554432
+edgefactor: 16
+terasize: 8.58993459199999983e-03
+A: 5.69999999999999951e-01
+B: 1.90000000000000002e-01
+C: 1.90000000000000002e-01
+D: 5.00000000000000444e-02
+generation_time: 6.04344422189999975e+01
+construction_time: 1.05056322358000003e+02
+nbfs: 64
+min_time: 2.24003802739999998e+01
+firstquartile_time: 2.52815655162499979e+01
+median_time: 2.73873803560000013e+01
+thirdquartile_time: 3.13446345390000012e+01
+max_time: 3.20372813019999967e+01
+mean_time: 2.79591408270937514e+01
+stddev_time: 2.97144618287322260e+00
+min_nedge: 5.36865498000000000e+08
+firstquartile_nedge: 5.36865498000000000e+08
+median_nedge: 5.36865498000000000e+08
+thirdquartile_nedge: 5.36865498000000000e+08
+max_nedge: 5.36865498000000000e+08
+mean_nedge: 5.36865498000000000e+08
+stddev_nedge: 0.00000000000000000e+00
+min_TEPS: 1.67575236156660095e+07
+firstquartile_TEPS: 1.72982965136628821e+07
+median_TEPS: 1.98137365893973596e+07
+thirdquartile_TEPS: 2.14392930175702944e+07
+max_TEPS: 2.39668028592861369e+07
+harmonic_mean_TEPS: 1.92017881135943756e+07
+harmonic_stddev_TEPS: 2.57107914544844854e+05
+	Command being timed: "/home/ubuntu/shared_folder//graph500-2.1/16GB/repeat0/run.sh -s 25"
+	User time (seconds): 12683.98
+	System time (seconds): 37.59
+	Percent of CPU this job got: 377%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 56:12.12
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 18397920
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 45
+	Minor (reclaiming a frame) page faults: 19154915
+	Voluntary context switches: 2526
+	Involuntary context switches: 30307
+	Swaps: 0
+	File system inputs: 960
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+SCALE: 25
+nvtx: 33554432
+edgefactor: 16
+terasize: 8.58993459199999983e-03
+A: 5.69999999999999951e-01
+B: 1.90000000000000002e-01
+C: 1.90000000000000002e-01
+D: 5.00000000000000444e-02
+generation_time: 6.02714833100000007e+01
+construction_time: 1.05652571758999997e+02
+nbfs: 64
+min_time: 2.15252756810000001e+01
+firstquartile_time: 2.51071388884999998e+01
+median_time: 2.72506829745000019e+01
+thirdquartile_time: 3.10218167655000023e+01
+max_time: 3.17545172869999988e+01
+mean_time: 2.77448579931093740e+01
+stddev_time: 2.94149815688720562e+00
+min_nedge: 5.36865498000000000e+08
+firstquartile_nedge: 5.36865498000000000e+08
+median_nedge: 5.36865498000000000e+08
+thirdquartile_nedge: 5.36865498000000000e+08
+max_nedge: 5.36865498000000000e+08
+mean_nedge: 5.36865498000000000e+08
+stddev_nedge: 0.00000000000000000e+00
+min_TEPS: 1.69067441066026762e+07
+firstquartile_TEPS: 1.74994549067963995e+07
+median_TEPS: 1.98956533542149514e+07
+thirdquartile_TEPS: 2.14831988649048395e+07
+max_TEPS: 2.49411671170317307e+07
+harmonic_mean_TEPS: 1.93500899566086866e+07
+harmonic_stddev_TEPS: 2.58463242227940762e+05
+	Command being timed: "/home/ubuntu/shared_folder//graph500-2.1/16GB/repeat0/run.sh -s 25"
+	User time (seconds): 12698.29
+	System time (seconds): 37.34
+	Percent of CPU this job got: 378%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 56:04.60
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 18397836
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 36
+	Minor (reclaiming a frame) page faults: 19154940
+	Voluntary context switches: 2546
+	Involuntary context switches: 29673
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+SCALE: 25
+nvtx: 33554432
+edgefactor: 16
+terasize: 8.58993459199999983e-03
+A: 5.69999999999999951e-01
+B: 1.90000000000000002e-01
+C: 1.90000000000000002e-01
+D: 5.00000000000000444e-02
+generation_time: 6.04498379360000015e+01
+construction_time: 1.06102936408999994e+02
+nbfs: 64
+min_time: 2.19740866009999998e+01
+firstquartile_time: 2.52372118790000002e+01
+median_time: 2.73567196285000023e+01
+thirdquartile_time: 3.10851507609999977e+01
+max_time: 3.17491981279999997e+01
+mean_time: 2.78310475587656256e+01
+stddev_time: 2.96854515423531451e+00
+min_nedge: 5.36865498000000000e+08
+firstquartile_nedge: 5.36865498000000000e+08
+median_nedge: 5.36865498000000000e+08
+thirdquartile_nedge: 5.36865498000000000e+08
+max_nedge: 5.36865498000000000e+08
+mean_nedge: 5.36865498000000000e+08
+stddev_nedge: 0.00000000000000000e+00
+min_TEPS: 1.69095766083783992e+07
+firstquartile_TEPS: 1.74293841684973165e+07
+median_TEPS: 1.98727376203701496e+07
+thirdquartile_TEPS: 2.15012135978161395e+07
+max_TEPS: 2.44317549005913287e+07
+harmonic_mean_TEPS: 1.92901649449738264e+07
+harmonic_stddev_TEPS: 2.59226724522756238e+05
+	Command being timed: "/home/ubuntu/shared_folder//graph500-2.1/16GB/repeat0/run.sh -s 25"
+	User time (seconds): 12771.04
+	System time (seconds): 36.66
+	Percent of CPU this job got: 379%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 56:19.13
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 18397936
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 42
+	Minor (reclaiming a frame) page faults: 19154958
+	Voluntary context switches: 2536
+	Involuntary context switches: 28187
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+SCALE: 25
+nvtx: 33554432
+edgefactor: 16
+terasize: 8.58993459199999983e-03
+A: 5.69999999999999951e-01
+B: 1.90000000000000002e-01
+C: 1.90000000000000002e-01
+D: 5.00000000000000444e-02
+generation_time: 6.02851580990000002e+01
+construction_time: 1.05052119957000002e+02
+nbfs: 64
+min_time: 2.21012442440000001e+01
+firstquartile_time: 2.52332437765000002e+01
+median_time: 2.73706033444999974e+01
+thirdquartile_time: 3.11352224610000015e+01
+max_time: 3.17503590120000005e+01
+mean_time: 2.78365678128749998e+01
+stddev_time: 2.96361511242791398e+00
+min_nedge: 5.36865498000000000e+08
+firstquartile_nedge: 5.36865498000000000e+08
+median_nedge: 5.36865498000000000e+08
+thirdquartile_nedge: 5.36865498000000000e+08
+max_nedge: 5.36865498000000000e+08
+mean_nedge: 5.36865498000000000e+08
+stddev_nedge: 0.00000000000000000e+00
+min_TEPS: 1.69089583458597250e+07
+firstquartile_TEPS: 1.74520230254605450e+07
+median_TEPS: 1.98708880072471723e+07
+thirdquartile_TEPS: 2.13799985098951533e+07
+max_TEPS: 2.42911888612672612e+07
+harmonic_mean_TEPS: 1.92863395232112035e+07
+harmonic_stddev_TEPS: 2.58693577797035541e+05
+	Command being timed: "/home/ubuntu/shared_folder//graph500-2.1/16GB/repeat0/run.sh -s 25"
+	User time (seconds): 12764.35
+	System time (seconds): 38.28
+	Percent of CPU this job got: 378%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 56:19.33
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 18398032
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 42
+	Minor (reclaiming a frame) page faults: 19154976
+	Voluntary context switches: 2543
+	Involuntary context switches: 31563
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

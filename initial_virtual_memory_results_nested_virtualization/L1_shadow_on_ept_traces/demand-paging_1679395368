@@ -1,0 +1,18 @@
+# started on Tue Mar 21 10:42:52 2023
+
+
+ Performance counter stats for process id '1773':
+
+              1928      kvm:kvm_entry                                               
+              1928      kvm:kvm_exit                                                
+                 0      kvm:kvm_nested_vmexit                                       
+                 0      kvm:kvm_nested_vmrun                                        
+         153143618      cycles:G                                                      (65.09%)
+         172544672      cycles:H                                                      (70.57%)
+          69805624      instructions:G            #    0.46  insn per cycle           (56.99%)
+          19458793      instructions:H            #    0.11  insn per cycle           (48.37%)
+              1320      kvm:kvm_page_fault                                          
+              1320      kvm:kvm_page_fault                                          
+
+       0.390240660 seconds time elapsed
+

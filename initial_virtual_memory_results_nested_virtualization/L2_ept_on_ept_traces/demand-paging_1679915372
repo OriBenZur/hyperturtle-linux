@@ -1,0 +1,20 @@
+# started on Mon Mar 27 11:09:32 2023
+
+
+ Performance counter stats for process id '1515524':
+
+           124,308      kvm:kvm_entry                                               
+           124,337      kvm:kvm_exit                                                
+            16,316      kvm:kvm_nested_vmexit                                       
+                 0      kvm:kvm_nested_vmrun                                        
+    23,070,207,174      cycles:G                                                      (37.44%)
+     1,617,555,287      cycles:H                                                      (37.94%)
+    19,933,807,693      instructions:G            #    0.86  insn per cycle           (37.97%)
+     1,064,150,181      instructions:H            #    0.66  insn per cycle           (37.49%)
+               493      kvm:kvm_page_fault                                          
+               493      kvm:kvm_page_fault                                          
+                 0      ept.walk_cycles:H                                             (37.63%)
+       860,502,389      ept.walk_cycles:G                                             (37.55%)
+
+       8.585033029 seconds time elapsed
+

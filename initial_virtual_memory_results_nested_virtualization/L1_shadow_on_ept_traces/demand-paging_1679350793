@@ -1,0 +1,18 @@
+# started on Mon Mar 20 22:19:53 2023
+
+
+ Performance counter stats for process id '6112':
+
+          17323765      kvm:kvm_entry                                               
+          17323770      kvm:kvm_exit                                                
+                 0      kvm:kvm_nested_vmexit                                       
+                 0      kvm:kvm_nested_vmrun                                        
+      128530697567      cycles:G                                                    
+      304077031892      cycles:H                                                    
+       61536432484      instructions:G            #    0.48  insn per cycle         
+      147227200630      instructions:H            #    0.48  insn per cycle         
+          15962953      kvm:kvm_page_fault                                          
+          15962954      kvm:kvm_page_fault                                          
+
+     712.752899993 seconds time elapsed
+

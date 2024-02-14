@@ -1,0 +1,18 @@
+# started on Sun Mar 19 23:29:18 2023
+
+
+ Performance counter stats for process id '8390':
+
+           1436423      kvm:kvm_entry                                               
+           1436434      kvm:kvm_exit                                                
+                 0      kvm:kvm_nested_vmexit                                       
+                 0      kvm:kvm_nested_vmrun                                        
+       33529547850      cycles:G                                                    
+      108391847657      cycles:H                                                    
+       26179636286      instructions:G            #    0.78  insn per cycle         
+       36365973174      instructions:H            #    0.34  insn per cycle         
+            733207      kvm:kvm_page_fault                                          
+            733215      kvm:kvm_page_fault                                          
+
+      92.244696312 seconds time elapsed
+

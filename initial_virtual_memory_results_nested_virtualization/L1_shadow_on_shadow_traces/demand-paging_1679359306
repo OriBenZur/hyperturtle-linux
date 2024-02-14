@@ -1,0 +1,18 @@
+# started on Tue Mar 21 00:41:46 2023
+
+
+ Performance counter stats for process id '3047':
+
+          17517444      kvm:kvm_entry                                               
+          17517444      kvm:kvm_exit                                                
+                 0      kvm:kvm_nested_vmexit                                       
+                 0      kvm:kvm_nested_vmrun                                        
+      126988357583      cycles:G                                                    
+      375949215208      cycles:H                                                    
+       63043838887      instructions:G            #    0.50  insn per cycle         
+      159828885923      instructions:H            #    0.43  insn per cycle         
+          15969506      kvm:kvm_page_fault                                          
+          15969506      kvm:kvm_page_fault                                          
+
+     847.189954488 seconds time elapsed
+

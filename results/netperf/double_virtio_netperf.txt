@@ -1,0 +1,88 @@
+Testing latency for packet size: 64
+MIGRATED UDP REQUEST/RESPONSE TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 10.0.0.1 (10.0.0.) port 0 AF_INET : histogram : spin interval : first burst 0
+Mean Latency Microseconds,99th Percentile Latency Microseconds,Stddev Latency Microseconds,Transaction Rate Tran/s
+114.71,132,8.46,999.985
+
+Histogram of request/response times
+UNIT_USEC     :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+TEN_USEC      :    0:    0:    0:    0:    0:    0:    0:    0:    0:  401
+HUNDRED_USEC  :    0: 9591:    7:    1:    0:    0:    0:    0:    0:    0
+UNIT_MSEC     :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+TEN_MSEC      :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+HUNDRED_MSEC  :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+UNIT_SEC      :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+TEN_SEC       :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+>100_SECS: 0
+HIST_TOTAL:      10000
+Testing latency for packet size: 128
+MIGRATED UDP REQUEST/RESPONSE TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 10.0.0.1 (10.0.0.) port 0 AF_INET : histogram : spin interval : first burst 0
+Mean Latency Microseconds,99th Percentile Latency Microseconds,Stddev Latency Microseconds,Transaction Rate Tran/s
+115.97,138,8.26,999.988
+
+Histogram of request/response times
+UNIT_USEC     :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+TEN_USEC      :    0:    0:    0:    0:    0:    0:    0:    0:    0:  378
+HUNDRED_USEC  :    0: 9620:    2:    0:    0:    0:    0:    0:    0:    0
+UNIT_MSEC     :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+TEN_MSEC      :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+HUNDRED_MSEC  :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+UNIT_SEC      :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+TEN_SEC       :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+>100_SECS: 0
+HIST_TOTAL:      10000
+Testing latency for packet size: 256
+MIGRATED UDP REQUEST/RESPONSE TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 10.0.0.1 (10.0.0.) port 0 AF_INET : histogram : spin interval : first burst 0
+Mean Latency Microseconds,99th Percentile Latency Microseconds,Stddev Latency Microseconds,Transaction Rate Tran/s
+116.52,137,7.74,999.965
+
+Histogram of request/response times
+UNIT_USEC     :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+TEN_USEC      :    0:    0:    0:    0:    0:    0:    0:    0:    0:  152
+HUNDRED_USEC  :    0: 9844:    4:    0:    0:    0:    0:    0:    0:    0
+UNIT_MSEC     :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+TEN_MSEC      :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+HUNDRED_MSEC  :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+UNIT_SEC      :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+TEN_SEC       :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+>100_SECS: 0
+HIST_TOTAL:      10000
+Testing latency for packet size: 512
+MIGRATED UDP REQUEST/RESPONSE TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 10.0.0.1 (10.0.0.) port 0 AF_INET : histogram : spin interval : first burst 0
+Mean Latency Microseconds,99th Percentile Latency Microseconds,Stddev Latency Microseconds,Transaction Rate Tran/s
+117.51,135,5.97,999.990
+
+Histogram of request/response times
+UNIT_USEC     :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+TEN_USEC      :    0:    0:    0:    0:    0:    0:    0:    0:    0:   73
+HUNDRED_USEC  :    0: 9926:    1:    0:    0:    0:    0:    0:    0:    0
+UNIT_MSEC     :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+TEN_MSEC      :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+HUNDRED_MSEC  :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+UNIT_SEC      :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+TEN_SEC       :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+>100_SECS: 0
+HIST_TOTAL:      10000
+Testing latency for packet size: 1024
+MIGRATED UDP REQUEST/RESPONSE TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 10.0.0.1 (10.0.0.) port 0 AF_INET : histogram : spin interval : first burst 0
+Mean Latency Microseconds,99th Percentile Latency Microseconds,Stddev Latency Microseconds,Transaction Rate Tran/s
+119.58,138,5.92,999.990
+
+Histogram of request/response times
+UNIT_USEC     :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+TEN_USEC      :    0:    0:    0:    0:    0:    0:    0:    0:    0:   16
+HUNDRED_USEC  :    0: 9983:    1:    0:    0:    0:    0:    0:    0:    0
+UNIT_MSEC     :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+TEN_MSEC      :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+HUNDRED_MSEC  :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+UNIT_SEC      :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+TEN_SEC       :    0:    0:    0:    0:    0:    0:    0:    0:    0:    0
+>100_SECS: 0
+HIST_TOTAL:      10000
+Testing throughput
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 10.0.0.1 (10.0.0.) port 0 AF_INET : histogram : spin interval
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    10.00    2196.57   

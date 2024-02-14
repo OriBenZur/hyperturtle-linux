@@ -1,0 +1,24 @@
+LABEL=cloudimg-rootfs   /        ext4   discard,errors=remount-ro       0 1
+LABEL=UEFI      /boot/efi       vfat    umask=0077      0 1
+hostshare      /home/ubuntu/shared_folder       9p trans=virtio,version=9p2000.L,rw,_netdev  0 0
+L0:
+Array length = 2^31 cells
+Number of iterations = 2^2
+Verification is disabled
+giga updates = 34.3597
+seconds elapsed = 940.317
+GUPS (Giga updates per second) = 0.0365406
+
+L1 Shadow:
+Number of iterations = 2^2
+Verification is disabled
+giga updates = 34.3597
+seconds elapsed = 2999.6
+GUPS (Giga updates per second) = 0.0114548
+
+L1 EPT:
+Number of iterations = 2^2
+Verification is disabled
+giga updates = 34.3597
+seconds elapsed = 1487.77
+GUPS (Giga updates per second) = 0.0230949

@@ -1,0 +1,18 @@
+# started on Tue Mar 21 02:40:51 2023
+
+
+ Performance counter stats for process id '8131':
+
+          17493713      kvm:kvm_entry                                               
+          17493718      kvm:kvm_exit                                                
+                 0      kvm:kvm_nested_vmexit                                       
+                 0      kvm:kvm_nested_vmrun                                        
+      125041642697      cycles:G                                                    
+      382246593234      cycles:H                                                    
+       62979680054      instructions:G            #    0.50  insn per cycle         
+      160503972896      instructions:H            #    0.42  insn per cycle         
+          15968897      kvm:kvm_page_fault                                          
+          15968897      kvm:kvm_page_fault                                          
+
+     862.962876981 seconds time elapsed
+

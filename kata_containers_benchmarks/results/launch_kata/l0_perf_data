@@ -1,0 +1,24 @@
+Analyze events for all VMs, all VCPUs:
+
+             VM-EXIT    Samples  Samples%     Time%    Min Time    Max Time         Avg time 
+
+       EPT_VIOLATION     315419    63.64%    37.15%      1.06us  23738.94us      3.78us ( +-   3.76% )
+       EPT_MISCONFIG      82542    16.66%    24.04%      0.66us  43940.63us      9.35us ( +-  12.61% )
+      IO_INSTRUCTION      68332    13.79%    35.51%      1.05us  40113.32us     16.68us ( +-   5.15% )
+               CPUID      11510     2.32%     0.40%      0.57us     55.76us      1.13us ( +-   0.65% )
+           CR_ACCESS       8334     1.68%     2.03%      0.61us   7026.10us      7.82us ( +-  26.55% )
+           MSR_WRITE       2944     0.59%     0.12%      0.56us     29.29us      1.34us ( +-   2.27% )
+  EXTERNAL_INTERRUPT       2656     0.54%     0.57%      0.99us     65.56us      6.92us ( +-   1.93% )
+    PREEMPTION_TIMER       1723     0.35%     0.10%      0.84us      7.08us      1.87us ( +-   0.61% )
+   PAUSE_INSTRUCTION       1024     0.21%     0.03%     run 0.57us      4.37us      0.81us ( +-   1.26% )
+            MSR_READ        970     0.20%     0.03%      0.62us      7.53us      1.08us ( +-   2.43% )
+          APIC_WRITE         50     0.01%     0.00%      0.59us      6.67us      1.96us ( +-  15.17% )
+              VMCALL         20     0.00%     0.00%      2.32us      3.90us      3.16us ( +-   2.92% )
+              WBINVD         20     0.00%     0.00%      0.84us      1.57us      1.13us ( +-   3.92% )
+unknown kvm exit code:55 on VMX
+             UNKNOWN         20     0.00%     0.00%      0.91us      3.85us      2.36us ( +-  11.76% )
+   PENDING_INTERRUPT         12     0.00%     0.00%      1.04us      2.46us      1.55us ( +-   8.60% )
+       EXCEPTION_NMI         10     0.00%     0.01%     15.62us     20.75us     19.00us ( +-   2.44% )
+           DR_ACCESS         10     0.00%     0.00%      2.01us      3.19us      2.57us ( +-   3.83% )
+
+Total Samples:495596, Total events handled time:3210098.03us.

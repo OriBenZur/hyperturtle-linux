@@ -1,0 +1,78 @@
+SCALE: 14
+nvtx: 16384
+edgefactor: 16
+terasize: 4.19430399999999992e-06
+A: 5.69999999999999951e-01
+B: 1.90000000000000002e-01
+C: 1.90000000000000002e-01
+D: 5.00000000000000444e-02
+generation_time: 1.74052470000000022e-02
+construction_time: 1.78175430000000017e-02
+nbfs: 64
+min_time: 3.12180000000000010e-04
+firstquartile_time: 3.59473000000000019e-04
+median_time: 3.86234500000000010e-04
+thirdquartile_time: 4.25395250000000047e-04
+max_time: 6.60026900000000062e-03
+mean_time: 5.08919093749999989e-04
+stddev_time: 7.81770458034608713e-04
+min_nedge: 2.62141000000000000e+05
+firstquartile_nedge: 2.62141000000000000e+05
+median_nedge: 2.62141000000000000e+05
+thirdquartile_nedge: 2.62141000000000000e+05
+max_nedge: 2.62141000000000000e+05
+mean_nedge: 2.62141000000000000e+05
+stddev_nedge: 0.00000000000000000e+00
+min_TEPS: 3.97167145763301402e+07
+firstquartile_TEPS: 6.24938700277422905e+08
+median_TEPS: 6.90087225607562304e+08
+thirdquartile_TEPS: 7.42608622476086140e+08
+max_TEPS: 8.39711064129668713e+08
+harmonic_mean_TEPS: 5.15093662665314317e+08
+harmonic_stddev_TEPS: 9.96888169000918567e+07
+	Command being timed: "./omp-csr"
+	User time (seconds): 1.00
+	System time (seconds): 0.01
+	Percent of CPU this job got: 1157%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.08
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 12436
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 8
+	Minor (reclaiming a frame) page faults: 2973
+	Voluntary context switches: 63
+	Involuntary context switches: 47
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./omp-csr"
+	User time (seconds): 1.00
+	System time (seconds): 0.01
+	Percent of CPU this job got: 1150%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.08
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 12400
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 2972
+	Voluntary context switches: 67
+	Involuntary context switches: 57
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

@@ -1,0 +1,512 @@
+# started on Mon Apr 10 19:11:33 2023
+
+
+ Performance counter stats for process id '1497859':
+
+           295,900      kvm:kvm_entry                                               
+           295,900      kvm:kvm_exit                                                
+            67,228      kvm:kvm_nested_vmexit                                       
+                 0      kvm:kvm_nested_vmrun                                        
+    74,644,337,832      cycles:G                                                      (82.91%)
+     4,445,297,572      cycles:H                                                      (83.44%)
+    58,422,690,769      instructions:G            #    0.78  insn per cycle           (83.40%)
+     2,313,322,339      instructions:H            #    0.52  insn per cycle           (83.52%)
+             2,234      kvm:kvm_page_fault                                          
+             2,234      kvm:kvm_page_fault                                          
+                 0      ept.walk_cycles:H                                             (83.71%)
+    11,147,253,510      ept.walk_cycles:G                                             (83.01%)
+
+      31.299173160 seconds time elapsed
+
+# started on Mon Apr 10 19:12:05 2023
+
+
+ Performance counter stats for process id '1497859':
+
+    12,714,477,282      dtlb_load_misses.walk_duration:G                                     (50.10%)
+     1,342,795,146      dtlb_store_misses.walk_duration:G                                     (50.20%)
+    72,112,420,818      cycles:G                                                      (50.26%)
+     6,468,497,462      itlb_misses.walk_duration:G                                     (50.15%)
+       154,113,440      dtlb_load_misses.walk_duration:H                                     (49.90%)
+        21,989,659      dtlb_store_misses.walk_duration:H                                     (49.80%)
+     3,579,897,215      cycles:H                                                      (49.74%)
+        91,675,904      itlb_misses.walk_duration:H                                     (49.85%)
+
+      30.312246490 seconds time elapsed
+
+# started on Mon Apr 10 19:12:35 2023
+
+
+ Performance counter stats for process id '1497859':
+
+        24,656,995      mem_load_uops_retired.l1_miss:H                                     (33.37%)
+        10,693,164      mem_load_uops_retired.l2_miss:H                                     (49.56%)
+           163,902      mem_load_uops_retired.l3_miss:H                                     (33.70%)
+       663,109,080      mem_load_uops_retired.l1_miss:G                                     (48.73%)
+       284,962,080      mem_load_uops_retired.l2_miss:G                                     (33.20%)
+         1,070,429      mem_load_uops_retired.l3_miss:G                                     (33.03%)
+
+      30.704585042 seconds time elapsed
+
+# started on Mon Apr 10 19:13:06 2023
+
+
+ Performance counter stats for process id '1497859':
+
+       426,824,534      mem_load_uops_retired.l1_hit:H                                     (33.42%)
+        13,622,910      mem_load_uops_retired.l2_hit:H                                     (39.45%)
+         9,075,637      mem_load_uops_retired.l3_hit:H                                     (45.10%)
+    15,387,640,673      mem_load_uops_retired.l1_hit:G                                     (33.52%)
+       363,376,618      mem_load_uops_retired.l2_hit:G                                     (39.87%)
+       276,120,988      mem_load_uops_retired.l3_hit:G                                     (45.25%)
+
+      30.287902093 seconds time elapsed
+
+# started on Mon Apr 10 19:13:36 2023
+
+
+ Performance counter stats for process id '1497859':
+
+           263,260      kvm:kvm_entry                                               
+           263,262      kvm:kvm_exit                                                
+            65,144      kvm:kvm_nested_vmexit                                       
+                 0      kvm:kvm_nested_vmrun                                        
+    72,813,533,618      cycles:G                                                      (83.32%)
+     3,913,149,252      cycles:H                                                      (83.56%)
+    58,067,535,424      instructions:G            #    0.80  insn per cycle           (81.94%)
+     1,932,742,678      instructions:H            #    0.49  insn per cycle           (83.77%)
+             1,293      kvm:kvm_page_fault                                          
+             1,293      kvm:kvm_page_fault                                          
+                 0      ept.walk_cycles:H                                             (83.75%)
+    11,261,364,392      ept.walk_cycles:G                                             (83.67%)
+
+      30.715285904 seconds time elapsed
+
+# started on Mon Apr 10 19:14:07 2023
+
+
+ Performance counter stats for process id '1497859':
+
+    13,033,155,674      dtlb_load_misses.walk_duration:G                                     (49.86%)
+     1,427,959,840      dtlb_store_misses.walk_duration:G                                     (50.68%)
+    71,193,671,975      cycles:G                                                      (51.02%)
+     6,556,657,298      itlb_misses.walk_duration:G                                     (50.29%)
+       153,292,214      dtlb_load_misses.walk_duration:H                                     (50.14%)
+        20,534,650      dtlb_store_misses.walk_duration:H                                     (49.32%)
+     2,933,872,016      cycles:H                                                      (48.98%)
+        85,158,714      itlb_misses.walk_duration:H                                     (49.72%)
+
+      30.293331796 seconds time elapsed
+
+# started on Mon Apr 10 19:14:37 2023
+
+
+ Performance counter stats for process id '1497859':
+
+        19,526,489      mem_load_uops_retired.l1_miss:H                                     (42.00%)
+         9,009,287      mem_load_uops_retired.l2_miss:H                                     (51.51%)
+           119,203      mem_load_uops_retired.l3_miss:H                                     (48.69%)
+       642,801,214      mem_load_uops_retired.l1_miss:G                                     (50.26%)
+       282,777,129      mem_load_uops_retired.l2_miss:G                                     (52.79%)
+         1,161,533      mem_load_uops_retired.l3_miss:G                                     (41.91%)
+
+      30.710309392 seconds time elapsed
+
+# started on Mon Apr 10 19:15:08 2023
+
+
+ Performance counter stats for process id '1497859':
+
+       380,026,215      mem_load_uops_retired.l1_hit:H                                     (32.79%)
+        12,870,590      mem_load_uops_retired.l2_hit:H                                     (32.94%)
+        10,040,180      mem_load_uops_retired.l3_hit:H                                     (33.08%)
+    15,105,536,358      mem_load_uops_retired.l1_hit:G                                     (34.57%)
+       363,117,152      mem_load_uops_retired.l2_hit:G                                     (34.23%)
+       276,143,008      mem_load_uops_retired.l3_hit:G                                     (33.23%)
+
+      30.278718007 seconds time elapsed
+
+# started on Mon Apr 10 19:15:38 2023
+
+
+ Performance counter stats for process id '1497859':
+
+           253,115      kvm:kvm_entry                                               
+           253,100      kvm:kvm_exit                                                
+            62,623      kvm:kvm_nested_vmexit                                       
+                 0      kvm:kvm_nested_vmrun                                        
+    72,530,825,118      cycles:G                                                      (83.53%)
+     3,687,983,070      cycles:H                                                      (83.35%)
+    55,857,619,093      instructions:G            #    0.77  insn per cycle           (83.38%)
+     1,692,885,779      instructions:H            #    0.46  insn per cycle           (83.07%)
+             1,231      kvm:kvm_page_fault                                          
+             1,231      kvm:kvm_page_fault                                          
+                 0      ept.walk_cycles:H                                             (83.43%)
+    11,634,959,823      ept.walk_cycles:G                                             (83.24%)
+
+      30.732603448 seconds time elapsed
+
+# started on Mon Apr 10 19:16:09 2023
+
+
+ Performance counter stats for process id '1497859':
+
+    12,829,901,605      dtlb_load_misses.walk_duration:G                                     (49.43%)
+     1,395,339,792      dtlb_store_misses.walk_duration:G                                     (49.89%)
+    71,777,895,705      cycles:G                                                      (50.40%)
+     6,559,880,730      itlb_misses.walk_duration:G                                     (50.60%)
+       158,864,743      dtlb_load_misses.walk_duration:H                                     (50.57%)
+        20,746,570      dtlb_store_misses.walk_duration:H                                     (50.11%)
+     3,233,356,467      cycles:H                                                      (49.60%)
+        81,120,649      itlb_misses.walk_duration:H                                     (49.40%)
+
+      30.308683520 seconds time elapsed
+
+# started on Mon Apr 10 19:16:40 2023
+
+
+ Performance counter stats for process id '1497859':
+
+        31,707,051      mem_load_uops_retired.l1_miss:H                                     (38.03%)
+        12,995,585      mem_load_uops_retired.l2_miss:H                                     (41.69%)
+           155,025      mem_load_uops_retired.l3_miss:H                                     (32.91%)
+       656,206,609      mem_load_uops_retired.l1_miss:G                                     (32.57%)
+       286,198,650      mem_load_uops_retired.l2_miss:G                                     (34.43%)
+         1,227,295      mem_load_uops_retired.l3_miss:G                                     (38.68%)
+
+      30.715369574 seconds time elapsed
+
+# started on Mon Apr 10 19:17:10 2023
+
+
+ Performance counter stats for process id '1497859':
+
+       395,305,872      mem_load_uops_retired.l1_hit:H                                     (34.00%)
+        14,719,055      mem_load_uops_retired.l2_hit:H                                     (34.32%)
+        11,647,514      mem_load_uops_retired.l3_hit:H                                     (34.06%)
+    15,797,623,631      mem_load_uops_retired.l1_hit:G                                     (37.16%)
+       369,210,854      mem_load_uops_retired.l2_hit:G                                     (33.20%)
+       270,815,584      mem_load_uops_retired.l3_hit:G                                     (37.31%)
+
+      30.275625708 seconds time elapsed
+
+# started on Mon Apr 10 19:17:41 2023
+
+
+ Performance counter stats for process id '1497859':
+
+           256,044      kvm:kvm_entry                                               
+           256,049      kvm:kvm_exit                                                
+            63,552      kvm:kvm_nested_vmexit                                       
+                 0      kvm:kvm_nested_vmrun                                        
+    72,699,763,763      cycles:G                                                      (83.35%)
+     3,929,274,800      cycles:H                                                      (83.90%)
+    58,645,691,242      instructions:G            #    0.81  insn per cycle           (81.75%)
+     1,912,790,814      instructions:H            #    0.49  insn per cycle           (83.67%)
+             1,377      kvm:kvm_page_fault                                          
+             1,377      kvm:kvm_page_fault                                          
+                 0      ept.walk_cycles:H                                             (83.57%)
+    11,321,869,295      ept.walk_cycles:G                                             (83.65%)
+
+      30.708398876 seconds time elapsed
+
+# started on Mon Apr 10 19:18:12 2023
+
+
+ Performance counter stats for process id '1497859':
+
+    12,693,662,972      dtlb_load_misses.walk_duration:G                                     (49.97%)
+     1,384,821,407      dtlb_store_misses.walk_duration:G                                     (50.23%)
+    72,282,423,129      cycles:G                                                      (49.58%)
+     6,568,294,474      itlb_misses.walk_duration:G                                     (49.98%)
+       137,549,450      dtlb_load_misses.walk_duration:H                                     (50.03%)
+        20,318,213      dtlb_store_misses.walk_duration:H                                     (49.77%)
+     3,625,626,881      cycles:H                                                      (50.42%)
+        84,694,536      itlb_misses.walk_duration:H                                     (50.02%)
+
+      30.294256312 seconds time elapsed
+
+# started on Mon Apr 10 19:18:42 2023
+
+
+ Performance counter stats for process id '1497859':
+
+        27,346,341      mem_load_uops_retired.l1_miss:H                                     (40.61%)
+        12,234,400      mem_load_uops_retired.l2_miss:H                                     (45.09%)
+           166,510      mem_load_uops_retired.l3_miss:H                                     (41.35%)
+       673,614,312      mem_load_uops_retired.l1_miss:G                                     (45.33%)
+       295,322,141      mem_load_uops_retired.l2_miss:G                                     (36.71%)
+         1,287,896      mem_load_uops_retired.l3_miss:G                                     (42.75%)
+
+      30.714336005 seconds time elapsed
+
+# started on Mon Apr 10 19:19:13 2023
+
+
+ Performance counter stats for process id '1497859':
+
+       350,674,146      mem_load_uops_retired.l1_hit:H                                     (44.25%)
+        14,762,031      mem_load_uops_retired.l2_hit:H                                     (40.25%)
+         9,516,176      mem_load_uops_retired.l3_hit:H                                     (40.18%)
+    16,084,502,892      mem_load_uops_retired.l1_hit:G                                     (43.37%)
+       367,946,848      mem_load_uops_retired.l2_hit:G                                     (46.84%)
+       274,175,938      mem_load_uops_retired.l3_hit:G                                     (43.24%)
+
+      30.298695372 seconds time elapsed
+
+# started on Mon Apr 10 19:19:43 2023
+
+
+ Performance counter stats for process id '1497859':
+
+           250,317      kvm:kvm_entry                                               
+           250,317      kvm:kvm_exit                                                
+            61,188      kvm:kvm_nested_vmexit                                       
+                 0      kvm:kvm_nested_vmrun                                        
+    72,688,106,050      cycles:G                                                      (83.30%)
+     3,599,837,267      cycles:H                                                      (83.19%)
+    57,764,707,867      instructions:G            #    0.79  insn per cycle           (83.14%)
+     1,922,158,371      instructions:H            #    0.53  insn per cycle           (83.55%)
+             1,259      kvm:kvm_page_fault                                          
+             1,259      kvm:kvm_page_fault                                          
+                 0      ept.walk_cycles:H                                             (83.47%)
+    11,073,510,246      ept.walk_cycles:G                                             (83.36%)
+
+      30.699967022 seconds time elapsed
+
+# started on Mon Apr 10 19:20:14 2023
+
+
+ Performance counter stats for process id '1497859':
+
+    12,626,549,256      dtlb_load_misses.walk_duration:G                                     (49.80%)
+     1,284,571,590      dtlb_store_misses.walk_duration:G                                     (50.22%)
+    71,613,583,768      cycles:G                                                      (50.17%)
+     6,456,281,163      itlb_misses.walk_duration:G                                     (50.71%)
+       142,319,960      dtlb_load_misses.walk_duration:H                                     (50.20%)
+        21,522,065      dtlb_store_misses.walk_duration:H                                     (49.78%)
+     3,316,976,482      cycles:H                                                      (49.83%)
+        76,090,879      itlb_misses.walk_duration:H                                     (49.29%)
+
+      30.303565382 seconds time elapsed
+
+# started on Mon Apr 10 19:20:44 2023
+
+
+ Performance counter stats for process id '1497859':
+
+        22,768,854      mem_load_uops_retired.l1_miss:H                                     (43.73%)
+        10,055,491      mem_load_uops_retired.l2_miss:H                                     (46.30%)
+            91,841      mem_load_uops_retired.l3_miss:H                                     (40.24%)
+       646,390,434      mem_load_uops_retired.l1_miss:G                                     (40.58%)
+       284,375,294      mem_load_uops_retired.l2_miss:G                                     (41.84%)
+         1,038,162      mem_load_uops_retired.l3_miss:G                                     (47.73%)
+
+      30.702973069 seconds time elapsed
+
+# started on Mon Apr 10 19:21:15 2023
+
+
+ Performance counter stats for process id '1497859':
+
+       387,404,073      mem_load_uops_retired.l1_hit:H                                     (36.72%)
+        13,406,546      mem_load_uops_retired.l2_hit:H                                     (35.61%)
+        10,696,211      mem_load_uops_retired.l3_hit:H                                     (34.96%)
+    15,415,537,104      mem_load_uops_retired.l1_hit:G                                     (36.67%)
+       376,678,300      mem_load_uops_retired.l2_hit:G                                     (35.54%)
+       273,227,095      mem_load_uops_retired.l3_hit:G                                     (38.08%)
+
+      30.291353194 seconds time elapsed
+
+# started on Mon Apr 10 19:21:46 2023
+
+
+ Performance counter stats for process id '1497859':
+
+           257,280      kvm:kvm_entry                                               
+           257,280      kvm:kvm_exit                                                
+            63,264      kvm:kvm_nested_vmexit                                       
+                 0      kvm:kvm_nested_vmrun                                        
+    72,834,128,359      cycles:G                                                      (83.13%)
+     3,695,451,573      cycles:H                                                      (83.21%)
+    57,201,312,640      instructions:G            #    0.79  insn per cycle           (83.60%)
+     1,877,103,060      instructions:H            #    0.51  insn per cycle           (83.67%)
+             1,271      kvm:kvm_page_fault                                          
+             1,271      kvm:kvm_page_fault                                          
+                 0      ept.walk_cycles:H                                             (83.28%)
+    11,431,021,767      ept.walk_cycles:G                                             (83.10%)
+
+      30.715015657 seconds time elapsed
+
+# started on Mon Apr 10 19:22:16 2023
+
+
+ Performance counter stats for process id '1497859':
+
+    12,665,389,157      dtlb_load_misses.walk_duration:G                                     (49.76%)
+     1,511,710,395      dtlb_store_misses.walk_duration:G                                     (50.40%)
+    71,253,206,555      cycles:G                                                      (50.59%)
+     6,590,173,927      itlb_misses.walk_duration:G                                     (50.55%)
+       149,546,328      dtlb_load_misses.walk_duration:H                                     (50.24%)
+        21,169,051      dtlb_store_misses.walk_duration:H                                     (49.60%)
+     3,025,032,529      cycles:H                                                      (49.41%)
+        80,992,580      itlb_misses.walk_duration:H                                     (49.45%)
+
+      30.304616604 seconds time elapsed
+
+# started on Mon Apr 10 19:22:47 2023
+
+
+ Performance counter stats for process id '1497859':
+
+        22,408,540      mem_load_uops_retired.l1_miss:H                                     (35.71%)
+        10,220,286      mem_load_uops_retired.l2_miss:H                                     (49.02%)
+           179,518      mem_load_uops_retired.l3_miss:H                                     (48.14%)
+       652,990,805      mem_load_uops_retired.l1_miss:G                                     (41.34%)
+       288,736,525      mem_load_uops_retired.l2_miss:G                                     (45.24%)
+         1,243,724      mem_load_uops_retired.l3_miss:G                                     (45.54%)
+
+      30.686358657 seconds time elapsed
+
+# started on Mon Apr 10 19:23:18 2023
+
+
+ Performance counter stats for process id '1497859':
+
+       371,023,146      mem_load_uops_retired.l1_hit:H                                     (44.85%)
+        14,384,373      mem_load_uops_retired.l2_hit:H                                     (40.74%)
+        10,618,258      mem_load_uops_retired.l3_hit:H                                     (34.51%)
+    15,565,132,326      mem_load_uops_retired.l1_hit:G                                     (38.60%)
+       356,099,635      mem_load_uops_retired.l2_hit:G                                     (39.85%)
+       286,261,964      mem_load_uops_retired.l3_hit:G                                     (45.24%)
+
+      30.300103315 seconds time elapsed
+
+# started on Mon Apr 10 19:23:48 2023
+
+
+ Performance counter stats for process id '1497859':
+
+           261,788      kvm:kvm_entry                                               
+           261,788      kvm:kvm_exit                                                
+            64,374      kvm:kvm_nested_vmexit                                       
+                 0      kvm:kvm_nested_vmrun                                        
+    73,126,469,210      cycles:G                                                      (82.87%)
+     3,904,410,724      cycles:H                                                      (83.43%)
+    57,739,086,481      instructions:G            #    0.79  insn per cycle           (83.48%)
+     1,984,217,012      instructions:H            #    0.51  insn per cycle           (83.52%)
+             1,546      kvm:kvm_page_fault                                          
+             1,546      kvm:kvm_page_fault                                          
+                 0      ept.walk_cycles:H                                             (83.23%)
+    11,366,811,542      ept.walk_cycles:G                                             (83.47%)
+
+      30.712971136 seconds time elapsed
+
+# started on Mon Apr 10 19:24:19 2023
+
+
+ Performance counter stats for process id '1497859':
+
+    12,826,384,216      dtlb_load_misses.walk_duration:G                                     (50.98%)
+     1,368,474,720      dtlb_store_misses.walk_duration:G                                     (51.34%)
+    70,608,508,618      cycles:G                                                      (51.23%)
+     6,480,294,819      itlb_misses.walk_duration:G                                     (50.92%)
+       123,846,325      dtlb_load_misses.walk_duration:H                                     (49.02%)
+        21,198,466      dtlb_store_misses.walk_duration:H                                     (48.67%)
+     2,640,468,979      cycles:H                                                      (48.77%)
+        79,328,275      itlb_misses.walk_duration:H                                     (49.08%)
+
+      30.307288015 seconds time elapsed
+
+# started on Mon Apr 10 19:24:49 2023
+
+
+ Performance counter stats for process id '1497859':
+
+        18,929,339      mem_load_uops_retired.l1_miss:H                                     (34.69%)
+        10,932,220      mem_load_uops_retired.l2_miss:H                                     (35.88%)
+           108,903      mem_load_uops_retired.l3_miss:H                                     (43.50%)
+       661,446,001      mem_load_uops_retired.l1_miss:G                                     (47.82%)
+       289,104,610      mem_load_uops_retired.l2_miss:G                                     (55.77%)
+           999,453      mem_load_uops_retired.l3_miss:G                                     (40.65%)
+
+      30.692187109 seconds time elapsed
+
+# started on Mon Apr 10 19:25:20 2023
+
+
+ Performance counter stats for process id '1497859':
+
+       467,529,953      mem_load_uops_retired.l1_hit:H                                     (34.31%)
+        12,882,610      mem_load_uops_retired.l2_hit:H                                     (50.00%)
+         9,707,004      mem_load_uops_retired.l3_hit:H                                     (32.97%)
+    15,569,321,353      mem_load_uops_retired.l1_hit:G                                     (38.29%)
+       371,124,065      mem_load_uops_retired.l2_hit:G                                     (32.95%)
+       278,861,815      mem_load_uops_retired.l3_hit:G                                     (48.49%)
+
+      30.276379729 seconds time elapsed
+
+# started on Mon Apr 10 19:25:50 2023
+
+
+ Performance counter stats for process id '1497859':
+
+           250,177      kvm:kvm_entry                                               
+           250,177      kvm:kvm_exit                                                
+            62,819      kvm:kvm_nested_vmexit                                       
+                 0      kvm:kvm_nested_vmrun                                        
+    72,483,767,732      cycles:G                                                      (83.51%)
+     3,875,228,956      cycles:H                                                      (83.82%)
+    57,221,727,870      instructions:G            #    0.79  insn per cycle           (83.27%)
+     1,881,091,237      instructions:H            #    0.49  insn per cycle           (83.48%)
+             1,265      kvm:kvm_page_fault                                          
+             1,265      kvm:kvm_page_fault                                          
+                 0      ept.walk_cycles:H                                             (82.84%)
+    11,291,661,062      ept.walk_cycles:G                                             (83.08%)
+
+      30.731075412 seconds time elapsed
+
+# started on Mon Apr 10 19:26:21 2023
+
+
+ Performance counter stats for process id '1497859':
+
+    12,792,232,297      dtlb_load_misses.walk_duration:G                                     (49.61%)
+     1,343,762,979      dtlb_store_misses.walk_duration:G                                     (50.00%)
+    71,642,506,200      cycles:G                                                      (50.10%)
+     6,531,160,119      itlb_misses.walk_duration:G                                     (50.79%)
+       153,029,030      dtlb_load_misses.walk_duration:H                                     (50.39%)
+        22,781,203      dtlb_store_misses.walk_duration:H                                     (50.00%)
+     3,312,552,183      cycles:H                                                      (49.90%)
+        81,661,584      itlb_misses.walk_duration:H                                     (49.22%)
+
+      30.289067981 seconds time elapsed
+
+# started on Mon Apr 10 19:26:52 2023
+
+
+ Performance counter stats for process id '1497859':
+
+        19,778,438      mem_load_uops_retired.l1_miss:H                                     (43.77%)
+         9,622,874      mem_load_uops_retired.l2_miss:H                                     (43.57%)
+           130,424      mem_load_uops_retired.l3_miss:H                                     (51.08%)
+       645,846,176      mem_load_uops_retired.l1_miss:G                                     (46.01%)
+       281,104,170      mem_load_uops_retired.l2_miss:G                                     (33.73%)
+         1,200,948      mem_load_uops_retired.l3_miss:G                                     (33.17%)
+
+      30.707656876 seconds time elapsed
+
+# started on Mon Apr 10 19:27:22 2023
+
+
+ Performance counter stats for process id '1497859':
+
+       334,989,047      mem_load_uops_retired.l1_hit:H                                     (49.18%)
+        14,085,622      mem_load_uops_retired.l2_hit:H                                     (33.76%)
+        10,146,627      mem_load_uops_retired.l3_hit:H                                     (38.80%)
+    15,548,504,250      mem_load_uops_retired.l1_hit:G                                     (33.38%)
+       374,672,065      mem_load_uops_retired.l2_hit:G                                     (43.78%)
+       273,021,029      mem_load_uops_retired.l3_hit:G                                     (33.02%)
+
+      30.297397025 seconds time elapsed
+
