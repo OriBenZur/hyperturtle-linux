@@ -1245,10 +1245,10 @@ search_memslots(struct kvm_memslots *slots, gfn_t gfn, int *index)
 
 	if (unlikely(!slots->used_slots))
 		return NULL;
-
+	// printk("gfn: %llu", gfn);
 	while (start < end) {
 		int slot = start + (end - start) / 2;
-
+		// printk("memslots[slot].base_gfn: %llu, npages: %lu", memslots[slot].base_gfn, memslots[slot].npages);
 		if (gfn >= memslots[slot].base_gfn)
 			end = slot;
 		else
@@ -1299,6 +1299,7 @@ __gfn_to_hva_memslot(const struct kvm_memory_slot *slot, gfn_t gfn)
 	 */
 	unsigned long offset = gfn - slot->base_gfn;
 	offset = array_index_nospec(offset, slot->npages);
+	// printk("userspace_addr %lx; returning %lx\n", slot->userspace_addr, slot->userspace_addr + offset * PAGE_SIZE);
 	return slot->userspace_addr + offset * PAGE_SIZE;
 }
 

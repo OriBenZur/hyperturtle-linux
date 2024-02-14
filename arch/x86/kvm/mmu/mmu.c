@@ -54,6 +54,7 @@
 #include "trace.h"
 
 #include "paging.h"
+#include "../vmx/nested.h"
 
 extern bool itlb_multihit_kvm_mitigation;
 
@@ -295,6 +296,8 @@ void kvm_flush_remote_tlbs_with_address(struct kvm *kvm,
 
 	kvm_flush_remote_tlbs_with_range(kvm, &range);
 }
+EXPORT_SYMBOL_GPL(kvm_flush_remote_tlbs_with_address);
+
 
 static void mark_mmio_spte(struct kvm_vcpu *vcpu, u64 *sptep, u64 gfn,
 			   unsigned int access)
@@ -4018,13 +4021,16 @@ static int direct_page_fault(struct kvm_vcpu *vcpu, struct kvm_page_fault *fault
 	fault->gfn = fault->addr >> PAGE_SHIFT;
 	fault->slot = kvm_vcpu_gfn_to_memslot(vcpu, fault->gfn);
 
+	// Ori: I think that a write to EPT12 goes through here
+	// printk("page_fault_handle_page_track\n");
 	if (page_fault_handle_page_track(vcpu, fault))
 		return RET_PF_EMULATE;
 
+	// printk("fast_page_fault\n");
 	r = fast_page_fault(vcpu, fault);
 	if (r != RET_PF_INVALID)
 		return r;
-
+	// printk("mmu_topup_memory_caches\n");
 	r = mmu_topup_memory_caches(vcpu, false);
 	if (r)
 		return r;
@@ -4032,9 +4038,12 @@ static int direct_page_fault(struct kvm_vcpu *vcpu, struct kvm_page_fault *fault
 	mmu_seq = vcpu->kvm->mmu_notifier_seq;
 	smp_rmb();
 
+	// printk("kvm_faultin_pfn\n");
+	// Lets add bypass here, to see if it works
 	if (kvm_faultin_pfn(vcpu, fault, &r))
 		return r;
 
+	// printk("handle_abnormal_pfn\n");
 	if (handle_abnormal_pfn(vcpu, fault, ACC_ALL, &r))
 		return r;
 
@@ -4044,14 +4053,14 @@ static int direct_page_fault(struct kvm_vcpu *vcpu, struct kvm_page_fault *fault
 		read_lock(&vcpu->kvm->mmu_lock);
 	else
 		write_lock(&vcpu->kvm->mmu_lock);
-
+	// printk("is_page_fault_stale\n");
 	if (is_page_fault_stale(vcpu, fault, mmu_seq))
 		goto out_unlock;
-
+	// printk("make_mmu_pages_available\n");
 	r = make_mmu_pages_available(vcpu);
 	if (r)
 		goto out_unlock;
-
+	// printk("kvm_tdp_mmu_map\n");
 	if (is_tdp_mmu_fault)
 		r = kvm_tdp_mmu_map(vcpu, fault);
 	else
@@ -4062,6 +4071,7 @@ out_unlock:
 		read_unlock(&vcpu->kvm->mmu_lock);
 	else
 		write_unlock(&vcpu->kvm->mmu_lock);
+
 	kvm_release_pfn_clean(fault->pfn);
 	return r;
 }
@@ -4256,6 +4266,9 @@ static bool sync_mmio_spte(struct kvm_vcpu *vcpu, u64 *sptep, gfn_t gfn,
 
 	return false;
 }
+
+#include <asm/tlbflush.h>
+// #include <asm/tlb.h>
 
 #define PTTYPE_EPT 18 /* arbitrary */
 #define PTTYPE PTTYPE_EPT
@@ -5300,20 +5313,25 @@ int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa, u64 error_code,
 {
 	int r, emulation_type = EMULTYPE_PF;
 	bool direct = vcpu->arch.mmu->direct_map;
-
+	// printk("kvm_mmu_page_fault is guest mode: %d gpa: %llx rsvd bits: %llx\n", (bool)(vcpu->arch.hflags & HF_GUEST_MASK), cr2_or_gpa, error_code & PFERR_RSVD_MASK);
 	if (WARN_ON(!VALID_PAGE(vcpu->arch.mmu->root_hpa)))
 		return RET_PF_RETRY;
-
+	// printk("entered kvm_mmu_page_fault\n");
 	r = RET_PF_INVALID;
 	if (unlikely(error_code & PFERR_RSVD_MASK)) {
+		// printk("trying handle_mmio_page_fault\n");
 		r = handle_mmio_page_fault(vcpu, cr2_or_gpa, direct);
-		if (r == RET_PF_EMULATE)
+		if (r == RET_PF_EMULATE) {
+			// printk("handle_mmio_page_fault lead to emulate\n");
 			goto emulate;
+		}
 	}
 
 	if (r == RET_PF_INVALID) {
+		// printk("trying kvm_mmu_do_page_fault\n");
 		r = kvm_mmu_do_page_fault(vcpu, cr2_or_gpa,
 					  lower_32_bits(error_code), false);
+		// printk("kvm_mmu_do_page_fault returned %d\n", r);
 		if (KVM_BUG_ON(r == RET_PF_INVALID, vcpu->kvm))
 			return -EIO;
 	}
@@ -5347,8 +5365,10 @@ int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa, u64 error_code,
 	 * explicitly shadowing L1's page tables, i.e. unprotecting something
 	 * for L1 isn't going to magically fix whatever issue cause L2 to fail.
 	 */
-	if (!mmio_info_in_cache(vcpu, cr2_or_gpa, direct) && !is_guest_mode(vcpu))
+	if (!mmio_info_in_cache(vcpu, cr2_or_gpa, direct) && !is_guest_mode(vcpu)) {
+		// printk("enabling retry from emulation error code: %llx gpa: %llx\n", error_code, cr2_or_gpa);
 		emulation_type |= EMULTYPE_ALLOW_RETRY_PF;
+	}
 emulate:
 	return x86_emulate_instruction(vcpu, cr2_or_gpa, emulation_type, insn,
 				       insn_len);
@@ -5359,15 +5379,17 @@ void kvm_mmu_invalidate_gva(struct kvm_vcpu *vcpu, struct kvm_mmu *mmu,
 			    gva_t gva, hpa_t root_hpa)
 {
 	int i;
-
+	printk("kvm_mmu_invalidate_gva is guest mode: %d\n", (bool)(vcpu->arch.hflags & HF_GUEST_MASK));
 	/* It's actually a GPA for vcpu->arch.guest_mmu.  */
 	if (mmu != &vcpu->arch.guest_mmu) {
+		printk("in here\n");
 		/* INVLPG on a non-canonical address is a NOP according to the SDM.  */
 		if (is_noncanonical_address(gva, vcpu))
 			return;
 
 		static_call(kvm_x86_tlb_flush_gva)(vcpu, gva);
 	}
+	printk("in here2\n");
 
 	if (!mmu->invlpg)
 		return;

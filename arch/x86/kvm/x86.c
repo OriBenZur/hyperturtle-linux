@@ -82,6 +82,9 @@
 #include <asm/sgx.h>
 #include <clocksource/hyperv_timer.h>
 
+#include "mmu/mmu_internal.h"
+#include "mmu/tdp_mmu.h"
+
 #define CREATE_TRACE_POINTS
 #include "trace.h"
 
@@ -110,6 +113,9 @@ static u64 __read_mostly cr4_reserved_bits = CR4_RESERVED_BITS;
 
 #define KVM_X2APIC_API_VALID_FLAGS (KVM_X2APIC_API_USE_32BIT_IDS | \
                                     KVM_X2APIC_API_DISABLE_BROADCAST_QUIRK)
+
+
+
 
 static void update_cr8_intercept(struct kvm_vcpu *vcpu);
 static void process_nmi(struct kvm_vcpu *vcpu);
@@ -7679,7 +7685,7 @@ static void prepare_emulation_failure_exit(struct kvm_vcpu *vcpu, u64 *data,
 	struct kvm_run *run = vcpu->run;
 	u64 info[5];
 	u8 info_start;
-
+	printk("preprate_emulation_failure_exit\n");
 	/*
 	 * Zero the whole array used to retrieve the exit info, as casting to
 	 * u32 for select entries will leave some chunks uninitialized.
@@ -8878,6 +8884,15 @@ static int complete_hypercall_exit(struct kvm_vcpu *vcpu)
 	return kvm_skip_emulated_instruction(vcpu);
 }
 
+u32 ept_bypass_index = 0;
+EXPORT_SYMBOL_GPL(ept_bypass_index);
+u64 __iomem *ept_bypass_maps[N_BYPASS_MAPS];
+EXPORT_SYMBOL_GPL(ept_bypass_maps);
+struct kvm_vcpu *hyperupcall_vcpu = NULL;
+EXPORT_SYMBOL_GPL(hyperupcall_vcpu);
+unsigned int bypass_counter = 0;
+EXPORT_SYMBOL_GPL(bypass_counter);
+
 int kvm_emulate_hypercall(struct kvm_vcpu *vcpu)
 {
 	unsigned long nr, a0, a1, a2, a3, ret;
@@ -8915,14 +8930,12 @@ int kvm_emulate_hypercall(struct kvm_vcpu *vcpu)
 
 	switch (nr) {
 	case 13: { // Load hyperupcall
-		u64 binary = a0, program_len = a1, major_id = a2, minor_id = a3;
+		u64 binary = a0, program_len = a1;
 		
 		vcpu->run->exit_reason = KVM_EXIT_HYPERCALL;
 		vcpu->run->hypercall.nr       = nr;
 		vcpu->run->hypercall.args[0]  = binary;
 		vcpu->run->hypercall.args[1]  = program_len;
-		vcpu->run->hypercall.args[2]  = major_id;
-		vcpu->run->hypercall.args[3]  = minor_id;
 		// printk("Hello hypercall! %lu %llu %llu %llu\n", nr, binary, major_id, minor_id);
 
 		vcpu->arch.complete_userspace_io = complete_hypercall_exit;
@@ -8930,7 +8943,7 @@ int kvm_emulate_hypercall(struct kvm_vcpu *vcpu)
 	}
 	case 14: { // Unload hyperupcall
 		u64 major_id = a0, minor_id = a1;
-		
+
 		vcpu->run->exit_reason = KVM_EXIT_HYPERCALL;
 		vcpu->run->hypercall.nr       = nr;
 		vcpu->run->hypercall.args[0]  = major_id;
@@ -8938,6 +8951,87 @@ int kvm_emulate_hypercall(struct kvm_vcpu *vcpu)
 
 		vcpu->arch.complete_userspace_io = complete_hypercall_exit;
 		return 0;
+	}
+	case 15: { // link hyperupcall
+		u64 hyperupcall_slot = a0, program_name = a1, major_id = a2, minor_id = a3;
+
+		vcpu->run->exit_reason = KVM_EXIT_HYPERCALL;
+		vcpu->run->hypercall.nr       = nr;
+		vcpu->run->hypercall.args[0]  = hyperupcall_slot;
+		vcpu->run->hypercall.args[1]  = program_name;
+		vcpu->run->hypercall.args[2]  = major_id;
+		vcpu->run->hypercall.args[3]  = minor_id;
+
+		vcpu->arch.complete_userspace_io = complete_hypercall_exit;
+		return 0;
+	}
+	case 16: { // unlink hyperupcall
+		u64 hyperupcall_slot = a0, program_slot = a1;
+
+		vcpu->run->exit_reason = KVM_EXIT_HYPERCALL;
+		vcpu->run->hypercall.nr       = nr;
+		vcpu->run->hypercall.args[0]  = hyperupcall_slot;
+		vcpu->run->hypercall.args[1]  = program_slot;
+
+		vcpu->arch.complete_userspace_io = complete_hypercall_exit;
+		return 0;
+	}
+	case 17: { // map hyperucall map
+		u64 hyperupcall_slot = a0, map_name = a1;
+
+		vcpu->run->exit_reason = KVM_EXIT_HYPERCALL;
+		vcpu->run->hypercall.nr       = nr;
+		vcpu->run->hypercall.args[0]  = hyperupcall_slot;
+		vcpu->run->hypercall.args[1]  = map_name;
+
+		vcpu->arch.complete_userspace_io = complete_hypercall_exit;
+		return 0;
+	}
+	case 18: { // unmap hyperupcall map
+		u64 hyperupcall_slot = a0, map_slot = a1;
+
+		vcpu->run->exit_reason = KVM_EXIT_HYPERCALL;
+		vcpu->run->hypercall.nr       = nr;
+		vcpu->run->hypercall.args[0]  = hyperupcall_slot;
+		vcpu->run->hypercall.args[1]  = map_slot;
+
+		vcpu->arch.complete_userspace_io = complete_hypercall_exit;
+		return 0;
+	}
+	case 19: { //hyperupcall map get/set
+		u64 hyperupcall_slot = a0, map_attr = a1;
+
+		vcpu->run->exit_reason = KVM_EXIT_HYPERCALL;
+		vcpu->run->hypercall.nr       = nr;
+		vcpu->run->hypercall.args[0]  = hyperupcall_slot;
+		vcpu->run->hypercall.args[1]  = map_attr;
+
+		vcpu->arch.complete_userspace_io = complete_hypercall_exit;
+		return 0;
+	}
+	case 20: { //remap page
+		u64 gpa = a0, pfn = 0;
+		u64 spte;
+		u64 *sptep;
+		// struct kvm_gfn_range range = {.slot = gfn_to_memslot(vcpu->kvm, gpa >> 12), .start = gpa >> 12, .end = (gpa >> 12) + 1, .may_block = false};
+		if (ept_bypass_maps[PFN_CACHE] == NULL) {
+			ret = -1;
+			break;
+		}
+		pfn = (u64)ioread64(&ept_bypass_maps[PFN_CACHE][bypass_counter % 4096]);
+		write_lock(&vcpu->kvm->mmu_lock);
+		// if (kvm_unmap_gfn_range(vcpu->kvm, &range)) {
+			kvm_flush_remote_tlbs_with_address(vcpu->kvm, gpa >> 12, 1);
+		// }
+		// kvm_tdp_mmu_walk_lockless_begin();
+		sptep = kvm_tdp_mmu_fast_pf_get_last_sptep(vcpu, gpa, &spte);
+		printk("spte: %llx\n", spte);
+		*sptep = (pfn << 12) | 0x600000000000B77ULL;
+		write_unlock(&vcpu->kvm->mmu_lock);
+		// kvm_tdp_mmu_walk_lockless_end();
+		iowrite64(gpa, &ept_bypass_maps[PFN_CACHE][bypass_counter++ % 4096]);
+		ret = 0;
+		break;
 	}
 	case KVM_HC_VAPIC_POLL_IRQ:
 		ret = 0;
@@ -10513,7 +10607,7 @@ int kvm_task_switch(struct kvm_vcpu *vcpu, u16 tss_selector, int idt_index,
 	int ret;
 
 	init_emulate_ctxt(vcpu);
-
+	printk("entered task switch\n");
 	ret = emulator_task_switch(ctxt, tss_selector, idt_index, reason,
 				   has_error_code, error_code);
 	if (ret) {
