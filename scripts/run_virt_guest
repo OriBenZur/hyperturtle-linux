@@ -1,3 +1,0 @@
-#!/bin/bash
-
-./run_virt_host $* -m 20 -c 6
