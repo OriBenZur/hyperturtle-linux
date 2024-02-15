@@ -198,6 +198,7 @@ static inline int kvm_mmu_do_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa,
 	if (fault.is_tdp)
 		return kvm_tdp_page_fault(vcpu, &fault);
 #endif
+	// When L1 is writing to EPT12 this returns RET_PF_EMULATE??
 	return vcpu->arch.mmu->page_fault(vcpu, &fault);
 }
 

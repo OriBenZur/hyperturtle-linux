@@ -98,6 +98,28 @@ bool make_spte(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp,
 	int level = sp->role.level;
 	u64 spte = SPTE_MMU_PRESENT_MASK;
 	bool wrprot = false;
+	static int total_counter = 0;
+	// static int no_host_writable_counter = 0;
+	// bool has_printed = false;
+
+	// if (!has_printed) {
+	// 	printk("SPTE_TDP_AD_DISABLED_MASK %llx\n", SPTE_TDP_AD_DISABLED_MASK);
+	// 	printk("SPTE_TDP_AD_WRPROT_ONLY_MASK %llx\n", SPTE_TDP_AD_WRPROT_ONLY_MASK);
+	// 	printk("shadow_present_mask %llx\n", shadow_present_mask);
+	// 	printk("ACC_EXEC_MASK %x\n", ACC_EXEC_MASK);
+	// 	printk("shadow_x_mask %llx\n", shadow_x_mask);
+	// 	printk("shadow_nx_mask %llx\n", shadow_nx_mask);
+	// 	printk("shadow_user_mask %llx\n", shadow_user_mask);
+	// 	printk("PT_PAGE_SIZE_MASK %llx\n", PT_PAGE_SIZE_MASK);
+	// 	printk("static_call(kvm_x86_get_mt_mask)(vcpu, gfn, kvm_is_mmio_pfn(pfn)) %llx\n", static_call(kvm_x86_get_mt_mask)(vcpu, gfn, kvm_is_mmio_pfn(pfn)));
+	// 	printk("shadow_host_writable_mask %llx\n", shadow_host_writable_mask);
+	// 	printk("shadow_me_mask %llx\n", shadow_me_mask);
+	// 	printk("shadow_mmu_writable_mask %llx\n", shadow_mmu_writable_mask);
+	// 	printk("PT_WRITABLE_MASK %llx\n", PT_WRITABLE_MASK);
+	// 	// printk("shadow_mmu_writable_mask %d", shadow_mmu_writable_mask);
+	// 	has_printed = true;
+	// }
+
 
 	if (sp->role.ad_disabled)
 		spte |= SPTE_TDP_AD_DISABLED_MASK;
@@ -113,6 +135,8 @@ bool make_spte(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp,
 	spte |= shadow_present_mask;
 	if (!prefetch)
 		spte |= spte_shadow_accessed_mask(spte);
+	// if (spte & (1 << 8)) printk("spte_shadow_accessed_mask(spte)\n");
+
 
 	if (level > PG_LEVEL_4K && (pte_access & ACC_EXEC_MASK) &&
 	    is_nx_huge_page_enabled()) {
@@ -130,13 +154,12 @@ bool make_spte(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp,
 	if (level > PG_LEVEL_4K)
 		spte |= PT_PAGE_SIZE_MASK;
 	if (tdp_enabled)
-		spte |= static_call(kvm_x86_get_mt_mask)(vcpu, gfn,
-			kvm_is_mmio_pfn(pfn));
+		spte |= static_call(kvm_x86_get_mt_mask)(vcpu, gfn, kvm_is_mmio_pfn(pfn));
 
 	if (host_writable)
 		spte |= shadow_host_writable_mask;
 	else
-		pte_access &= ~ACC_WRITE_MASK;
+		pte_access &= ~ACC_WRITE_MASK; // This turns off bit 0x2 in the beginning (0x2)
 
 	if (!kvm_is_mmio_pfn(pfn))
 		spte |= shadow_me_mask;
@@ -144,7 +167,7 @@ bool make_spte(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp,
 	spte |= (u64)pfn << PAGE_SHIFT;
 
 	if (pte_access & ACC_WRITE_MASK) {
-		spte |= PT_WRITABLE_MASK | shadow_mmu_writable_mask;
+		spte |= PT_WRITABLE_MASK | shadow_mmu_writable_mask; 
 
 		/*
 		 * Optimization: for pte sync, if spte was writable the hash
@@ -171,11 +194,13 @@ bool make_spte(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp,
 	}
 
 	if (pte_access & ACC_WRITE_MASK)
-		spte |= spte_shadow_dirty_mask(spte);
+		spte |= spte_shadow_dirty_mask(spte); // this turns on 1 << 9. only when host writeable
+	// if (spte & (1 << 8)) printk("spte_shadow_dirty_mask(spte)\n");
 
 out:
 	if (prefetch)
 		spte = mark_spte_for_access_track(spte);
+	// if (spte & (1 << 8)) printk("mark_spte_for_access_track(spte)\n");
 
 	WARN_ONCE(is_rsvd_spte(&vcpu->arch.mmu->shadow_zero_check, spte, level),
 		  "spte = 0x%llx, level = %d, rsvd bits = 0x%llx", spte, level,
@@ -188,6 +213,10 @@ out:
 	}
 
 	*new_spte = spte;
+	// if (!kvm_is_mmio_pfn(pfn) && 0x600000000000B77ULL != (spte ^ ((u64)pfn << PAGE_SHIFT))) {//0x975
+		// printk("pte flags: %llx, counter: %d/%d", spte ^ ((u64)pfn << PAGE_SHIFT), no_host_writable_counter++, total_counter);
+	// }
+	total_counter++;
 	return wrprot;
 }
 
