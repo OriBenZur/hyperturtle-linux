@@ -336,7 +336,7 @@ static inline bool FNAME(is_last_gpte)(struct kvm_mmu *mmu,
 }
 
 #if PTTYPE == PTTYPE_EPT
-static noinline void *alloc_bypass(gpa_t gpa) {
+static noinline void *alloc_bypass(gpa_t gpa, gpa_t pgd_gpa) {
 	return (void*)-1;
 }
 ALLOW_ERROR_INJECTION(alloc_bypass, ERRNO);
@@ -493,7 +493,7 @@ static int FNAME(walk_addr_generic)(struct guest_walker *walker,
 	// u64 new_spte;
 	// u64 *ebpf_pfn;
 	// pte_t ebpf_pte;
-	int ii = 0;
+	// int ii = 0;
 	#endif
 
 	trace_kvm_mmu_pagetable_walk(addr, access);
@@ -590,56 +590,35 @@ retry_walk:
 		// Check if the pte your got from userland is present
 		if (unlikely(!FNAME(is_present_gpte)(pte))) {
 			#if PTTYPE == PTTYPE_EPT
-			struct kvm_mmu_root_info *cached_root;
-			gpa_t l1_pfn;
+			// struct kvm_mmu_root_info *cached_root;
+			// gpa_t l1_pfn;
 
-			// ORI: OVERRIDE THE PTE HERE. or not - should probably do it in the injection
-			//printk("PTTYPE_EPT got error is_present_gpte %p\n", (void *)ull_pte);
 			if (walker->level != 1) goto error;
-			printk("gpa: %llx, orig pte: %llx ptep_user: %p\n", addr, ull_pte, ptep_user);
-			// if (frame_counter++ < 500) goto error;
 			if (pte != 0) goto error;
-			pte = (gpa_t)alloc_bypass(addr); // This should get us address of free struct sp and address of free page
-			printk("gpte non present on gpa: %llx, orig pte: %llx new pte: %llx ptep_user: %p is_user: %d\n", addr, ull_pte, pte, ptep_user, user_fault);
+			pte = (gpa_t)alloc_bypass(addr, mmu->get_guest_pgd(vcpu)); // This should get us address of free struct sp and address of free page
+			// printk("gpte non present on gpa: %llx, orig pte: %llx new pte: %llx ptep_user: %p is_user: %d\n", addr, ull_pte, pte, ptep_user, user_fault);
 			if (pte != (gpa_t)NULL && pte != (gpa_t)-1) {
-				printk("bypass allocations begin");
-				for (ii = 0; ii < mmu->root_level; ii++) {
-					printk("table_gfn[%d]: %llx pte_gpa[%d]: %llx ptep_user[%d]: %p\n", ii, walker->table_gfn[ii], ii, walker->pte_gpa[ii], ii, walker->ptep_user[ii]);
-				}
-				l1_pfn = (pte & ~0x600000000000B77ULL) >> 12;
-				// host_addr = kvm_vcpu_gfn_to_hva(vcpu, gpa_to_gfn(sp_header_gpa));
-				// sp_user = (struct kvm_mmu_page __user *)((host_addr ^ 0xFFF) + (sp_header_gpa & 0xFFF));
-				// printk("trying allocation bypass sp_user: %lx %llx\n", host_addr, pte);
-				// if (copy_from_user(&sp, sp_user, sizeof(sp)) != 0) goto error;
-				// printk("got sp_user: %p\n", sp_user);
-				// sp.role = vcpu->arch.mmu->mmu_role.base;
-				// sp.role.level = walker->level;
-				// sp.role.direct = true;
-				// sp.role.gpte_is_8_bytes = true;
-				// sp.role.access = ACC_ALL;
-				// sp.role.ad_disabled = false;
+				// printk("bypass allocations begin");
+				// for (ii = 0; ii < mmu->root_level; ii++) {
+				// 	printk("table_gfn[%d]: %llx pte_gpa[%d]: %llx ptep_user[%d]: %p\n", ii, walker->table_gfn[ii], ii, walker->pte_gpa[ii], ii, walker->ptep_user[ii]);
+				// }
 
-				// sp.gfn = *ebpf_pfn;
-				// Finished "allocation", now need to link
-
-				// wrprot = make_bypass_spte(vcpu, &sp, NULL, 0, sp.gfn, *ebpf_pfn, 0, true, false, true, &new_spte);
-				// if (copy_to_user(sp_user, &sp, sizeof(sp)) != 0) goto error;
-				// printk("copied sp to user\n");
-				
-				kvm_mmu_invalidate_gva(vcpu, mmu, addr, mmu->root_hpa);
+				/* Flush TLB(s) */
+				// l1_pfn = (pte & ~0x600000000000B77ULL) >> 12;
+				// kvm_mmu_invalidate_gva(vcpu, mmu, addr, mmu->root_hpa);
 				// nested_ept_invalidate_addr(vcpu, get_vmcs12(vcpu)->ept_pointer, addr);
-				for (ii = 0; ii < KVM_MMU_NUM_PREV_ROOTS; ii++) {
-					cached_root = &mmu->prev_roots[ii];
-					if (VALID_PAGE(cached_root->hpa) && (cached_root->pgd & GENMASK_ULL(51, 12)) == (get_vmcs12(vcpu)->ept_pointer & GENMASK_ULL(51, 12))) {
-						mmu->invlpg(vcpu, addr, cached_root->hpa);
-						mmu->invlpg(vcpu, l1_pfn, cached_root->hpa);
-						vcpu->arch.guest_mmu.invlpg(vcpu, addr, cached_root->hpa);
-						vcpu->arch.guest_mmu.invlpg(vcpu, addr, cached_root->hpa);
-					}
-				}
-				kvm_flush_remote_tlbs_with_address(vcpu->kvm, addr >> 12, 1);
-				kvm_flush_remote_tlbs_with_address(vcpu->kvm, l1_pfn, 1);
-				__flush_tlb_all();
+				// for (ii = 0; ii < KVM_MMU_NUM_PREV_ROOTS; ii++) {
+				// 	cached_root = &mmu->prev_roots[ii];
+				// 	if (VALID_PAGE(cached_root->hpa) && (cached_root->pgd & GENMASK_ULL(51, 12)) == (get_vmcs12(vcpu)->ept_pointer & GENMASK_ULL(51, 12))) {
+				// 		mmu->invlpg(vcpu, addr, cached_root->hpa);
+				// 		mmu->invlpg(vcpu, l1_pfn, cached_root->hpa);
+				// 		vcpu->arch.guest_mmu.invlpg(vcpu, addr, cached_root->hpa);
+				// 		vcpu->arch.guest_mmu.invlpg(vcpu, addr, cached_root->hpa);
+				// 	}
+				// }
+				// kvm_flush_remote_tlbs_with_address(vcpu->kvm, addr >> 12, 1);
+				// kvm_flush_remote_tlbs_with_address(vcpu->kvm, l1_pfn, 1);
+
 
 				/* Might need the following function later */
 				if (put_user(pte, ptep_user) != 0) {
@@ -650,7 +629,7 @@ retry_walk:
 					printk("failed alloc bypass 2\n");
 					goto error;
 				}
-				printk("alloc_bypass success. level: %d, pte: %llx\n", walker->level, pte);
+				// printk("alloc_bypass success. level: %d, pte: %llx\n", walker->level, pte);
 				goto retry_walk;
 			}
 			// update EPT12
@@ -659,10 +638,6 @@ retry_walk:
 			#endif
 			goto error;
 		}
-		#if PTTYPE == PTTYPE_EPT
-		if (walker->level == 1 && update_mapping(addr, pte) == 0) printk("update_mapping success\n");
-		else if (walker->level == 1) printk("update_mapping failed\n");
-		#endif
 
 		if (unlikely(__is_rsvd_bits_set(&mmu->guest_rsvd_check, pte, walker->level))) {
 			errcode = PFERR_RSVD_MASK | PFERR_PRESENT_MASK;
@@ -705,9 +680,6 @@ retry_walk:
 	}
 
 	gfn = gpte_to_gfn_lvl(pte, walker->level);
-	#if PTTYPE == PTTYPE_EPT
-	// if ((pte & 0x600000000000b77) != 0x600000000000b77) printk("guest pte flags: %llx\n", pte ^ (gfn << PAGE_SHIFT));
-	#endif
 	gfn += (addr & PT_LVL_OFFSET_MASK(walker->level)) >> PAGE_SHIFT;
 
 	if (PTTYPE == 32 && walker->level > PG_LEVEL_4K && is_cpuid_PSE36())
@@ -746,9 +718,6 @@ retry_walk:
 	pgprintk("%s: pte %llx pte_access %x pt_access %x\n",
 		 __func__, (u64)pte, walker->pte_access,
 		 walker->pt_access[walker->level - 1]);
-	#if PTTYPE == PTTYPE_EPT
-	printk("got no error\n");
-	#endif
 	return 1;
 
 error:

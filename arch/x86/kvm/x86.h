@@ -10,17 +10,6 @@
 
 void kvm_spurious_fault(void);
 
-#define MAPS_DEV_OFFSET 5
-enum allocBypassMaps {
-	PFN_CACHE = 0,
-	MEMSLOTS_BASE_GFNS,
-	MEMSLOTS_NPAGES,
-	MEMSLOTS_USERSPACE_ADDR,
-	SP_HEADERS,
-	COUNTERS,
-	N_BYPASS_MAPS
-};
-
 
 static __always_inline void kvm_guest_enter_irqoff(void)
 {

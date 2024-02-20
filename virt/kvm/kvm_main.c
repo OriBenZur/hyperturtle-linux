@@ -49,6 +49,7 @@
 #include <linux/sort.h>
 #include <linux/bsearch.h>
 #include <linux/io.h>
+#include <linux/io-64-nonatomic-lo-hi.h>
 #include <linux/lockdep.h>
 #include <linux/kthread.h>
 #include <linux/suspend.h>
@@ -1792,13 +1793,39 @@ out_bitmap:
 }
 EXPORT_SYMBOL_GPL(__kvm_set_memory_region);
 
+extern u64 __iomem *ept_bypass_maps[N_BYPASS_MAPS];
+void setup_bypass_memslots(struct kvm_vcpu *vcpu) {
+	struct kvm *kvm = vcpu->kvm;
+	struct kvm_memory_slot *memslot;
+	int i;
+	if (ept_bypass_maps[MEMSLOTS_BASE_GFNS] == NULL)
+		return;
+	mutex_lock(&kvm->slots_lock);
+	for (i = 0; i < kvm->memslots[0]->used_slots; i++) {
+		memslot = &kvm->memslots[0]->memslots[i];
+		iowrite64(memslot->base_gfn, &ept_bypass_maps[MEMSLOTS_BASE_GFNS][i]);
+		iowrite64(memslot->npages, &ept_bypass_maps[MEMSLOTS_NPAGES][i]);
+		iowrite64(memslot->userspace_addr, &ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][i]);
+	}
+	mutex_unlock(&kvm->slots_lock);
+	iowrite64(read_cr3_pa(), &ept_bypass_maps[COUNTERS][QEMU_CR3]);
+}
+EXPORT_SYMBOL_GPL(setup_bypass_memslots);
+
 int kvm_set_memory_region(struct kvm *kvm,
 			  const struct kvm_userspace_memory_region *mem)
 {
-	int r;
+	int r, i;
+	struct kvm_memory_slot *memslot;
 
 	mutex_lock(&kvm->slots_lock);
 	r = __kvm_set_memory_region(kvm, mem);
+	printk(KERN_INFO "as_id=%d \n", mem->slot >> 16);
+	for (i = 0; i < kvm->memslots[mem->slot >> 16]->used_slots; i++) {
+		memslot = &kvm->memslots[mem->slot >> 16]->memslots[i];
+		printk(KERN_INFO "memslot[%d]: base_gfn=%llx npages=%lx userspace_addr=%lx\n",
+			i, memslot->base_gfn, memslot->npages, memslot->userspace_addr);
+	}
 	mutex_unlock(&kvm->slots_lock);
 	return r;
 }

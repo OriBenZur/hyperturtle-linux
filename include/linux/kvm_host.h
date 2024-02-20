@@ -91,6 +91,35 @@
 #define KVM_PFN_ERR_HWPOISON	(KVM_PFN_ERR_MASK + 1)
 #define KVM_PFN_ERR_RO_FAULT	(KVM_PFN_ERR_MASK + 2)
 
+
+
+#define MAPS_DEV_OFFSET 5
+enum allocBypassMaps {
+	PFN_CACHE = 0,
+	COUNTERS,
+	MEMSLOTS_BASE_GFNS,
+	MEMSLOTS_NPAGES,
+	MEMSLOTS_USERSPACE_ADDR,
+	SP_HEADERS,
+	N_BYPASS_MAPS
+};
+
+enum allocBypassCounter {
+    BYPASS_ALLOCS_INDEX = 0,
+    BYPASS_ALLOC_ATTEMPS,
+    BYPASS_ALLOC_SUCCESS,
+    BYPASS_REMAP_SUCCESS,
+    REMAP_UPDATE_SUCCESS0,
+    REMAP_UPDATE_SUCCESS1,
+    REMAP_UPDATE_SUCCESS2,
+    REMAP_UPDATE_SUCCESS3,
+    REMAP_UPDATE_SUCCESS4,
+    BYPASS_ALLOC_ENABLE,
+    QEMU_CR3,
+    N_COUNTERS
+};
+
+
 /*
  * error pfns indicate that the gfn is in slot but faild to
  * translate it to pfn on host.
@@ -825,7 +854,7 @@ enum kvm_mr_change {
 	KVM_MR_MOVE,
 	KVM_MR_FLAGS_ONLY,
 };
-
+void setup_bypass_memslots(struct kvm_vcpu *vcpu);
 int kvm_set_memory_region(struct kvm *kvm,
 			  const struct kvm_userspace_memory_region *mem);
 int __kvm_set_memory_region(struct kvm *kvm,

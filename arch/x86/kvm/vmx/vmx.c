@@ -54,6 +54,8 @@
 #include <linux/io-64-nonatomic-lo-hi.h>
 #include <asm/tlbflush.h>
 #include <asm/set_memory.h>
+#include <linux/sched.h>
+#include <asm/pgtable_types.h>
 #include "../mmu/mmu_internal.h"
 #include "../mmu/tdp_mmu.h"
 
@@ -6664,7 +6666,7 @@ static int setup_ept_bypass_maps(struct kvm *kvm) {
 	// 	ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][i] = memslot->userspace_addr;
 	// }
 	// mutex_unlock(&kvm->slots_lock);
-	return i == 4 ? 0 : -1;
+	return i == 5 ? 0 : -1;
 }
 
 
@@ -6675,9 +6677,8 @@ static bool map_bypass_to_user_space(struct kvm_vcpu *vcpu) {
 	if (ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR] == NULL || vcpu->vcpu_id != 0)
 		return false;
 	while(true) {
-		u64 ept_spte;
-		u64 *ept_sptep;
-		// int leaf, root;
+		// u64 ept_spte;
+		// u64 *ept_sptep;
 
 		gpa_t gpa;
 		kvm_pfn_t pfn, old_pfn;
@@ -6685,77 +6686,51 @@ static bool map_bypass_to_user_space(struct kvm_vcpu *vcpu) {
 		pte_t orig_pte, new_pte;
 		u64 pte_delta;
 		unsigned long hva;
-		// struct page *page;
 		struct vm_area_struct *vma;
 		spinlock_t *ptl;
 
-		// printk("got here\n");
 		
 		gpa = (gpa_t)ioread64(&ept_bypass_maps[PFN_CACHE][ept_user_map_index]);
 		pfn = (kvm_pfn_t)ioread64(&ept_bypass_maps[PFN_CACHE][ept_user_map_index + 4096]);
 		if (pfn == (kvm_pfn_t)gpa || pfn  == 0) {
-			// printk("pfn: %llx gpa: %llx\n", pfn, gpa);
 			break;
 		}
-		// printk("leaf: %d, epte: %llx, ept pfn: %llx\n", leaf, ept_sptes[leaf], ept_sptes[leaf] >> 12);
-		// printk("root hpa: %llx\n", vcpu->arch.mmu->root_hpa);
-		printk("attaching pfn = %llx gpa = %llx\n", pfn, gpa);
-		// mmap_read_lock(current->mm);
+		// printk("attaching pfn = %llx gpa = %llx\n", pfn, gpa);
 		mmap_write_lock(current->mm);
 		hva = (unsigned long)kvm_vcpu_gfn_to_hva(vcpu, gpa_to_gfn(gpa));
 		if (kvm_is_error_hva(hva)) {
 			printk("kvm_is_error_hva failed %p\n", (void*)hva);
-			mmap_read_unlock(current->mm);
+			mmap_write_unlock(current->mm);
 			break;
 		}
 		vma = find_vma(current->mm, hva);
-		// mmap_read_unlock(current->mm);
 		if (vma == NULL) {
 			printk("find_vma failed\n");
+			mmap_write_unlock(current->mm);
 			break;
 		}
-		// r = remap_pfn_range(vma, hva, pfn, PAGE_SIZE, PAGE_SHARED_EXEC);
 
-		// down_write(&current->mm->mmap_lock);
 		if (!vma || hva < vma->vm_start || hva >= vma->vm_end) {
 			printk("Invalid user address\n");
 			up_write(&current->mm->mmap_lock);
+			mmap_write_unlock(current->mm);
 			break;
 		}
 		
 		ptep = get_locked_pte(current->mm, hva, &ptl);
 		if (pte_present(*ptep)) {
 			orig_pte = *ptep;
-			printk("orig_pte: %lx\n", orig_pte.pte);
+			// printk("orig_pte: %lx\n", orig_pte.pte);
 			old_pfn = pte_pfn(orig_pte);
 			pte_clear(current->mm, hva, ptep);
-			// asm volatile("invlpg (%0)" ::"r" (hva) : "memory");
-			// flush_tlb_page(vma, hva);
 		}
 		pte_unmap_unlock(ptep, ptl);
 
-		// pte = pfn_pte(pfn, PAGE_KERNEL);
-		// set_pte_at(current->mm, hva, ptep, pte);
-
-		// up_write(&current->mm->mmap_lock);
-		// ptep = get_locked_pte(current->mm, hva, &ptl);
-		// page = pte_page(*ptep);
-		// page->
-		// clear_page(page);
-		// pte_clear(current->mm, hva, ptep);
-		// *ptep = 0;
-		// flush_tlb_mm_range(vma->vm_mm, hva, hva + PAGE_SIZE, PAGE_SHIFT, false);
-		// put_page(page);
-		// pte_unmap_unlock(ptep, ptl);
-		
-		printk("got hva: %lx\n", hva);
+		// printk("got hva: %lx\n", hva);
 		r = vm_insert_page(vma, hva, pfn_to_page(pfn));
-		// if (set_memory_rw(hva, 1)) {
-		// 	printk("set_memory_rw failed\n");
-		// }
 		mmap_write_unlock(current->mm);
 		if (r < 0) {
-			printk("remap_pfn_range failed: %d. hva = %lx pfn = %llx\n", r, hva, pfn);
+			// printk("remap_pfn_range failed: %d. hva = %lx pfn = %llx\n", r, hva, pfn);
 			break;
 		}
 
@@ -6763,48 +6738,24 @@ static bool map_bypass_to_user_space(struct kvm_vcpu *vcpu) {
 		ptep->pte |= 0x842; // writeable, dirty, and SW dirty
 		new_pte = *ptep;
 		pte_delta = (new_pte.pte ^ pfn << 12) ^ (orig_pte.pte ^ (old_pfn << 12));
-		if (pte_delta) {
-			printk("dorig_pte: %lx, new_pte: %lx, pte_delta: %llx, hva: %lx\n", orig_pte.pte, new_pte.pte, pte_delta, hva);
-		}
-		printk("bypass alloc success: pte = %lx, pfn = %llx, gpa = %llx, hva = %lx\n", ptep->pte, pfn, gpa, hva);
+		// if (pte_delta) {
+		// 	printk("dorig_pte: %lx, new_pte: %lx, pte_delta: %llx, hva: %lx\n", orig_pte.pte, new_pte.pte, pte_delta, hva);
+		// }
+		// printk("bypass alloc success: pte = %lx, pfn = %llx, gpa = %llx, hva = %lx\n", ptep->pte, pfn, gpa, hva);
 		pte_unmap_unlock(ptep, ptl);
-		kvm_tdp_mmu_walk_lockless_begin();
-		ept_sptep = kvm_tdp_mmu_fast_pf_get_last_sptep(vcpu, gpa, &ept_spte);
-		printk("bypass alloc success: epte = %llx\n", *ept_sptep);
-		kvm_tdp_mmu_walk_lockless_end();
-		kvm_flush_remote_tlbs_with_address(vcpu->kvm, gpa >> 12, 1);
-		// sp->spt = phys_to_virt((u64)sp->spt);
-		// spin_lock(&vcpu->kvm->arch.tdp_mmu_pages_lock);
-		// list_add(&sp->link, &vcpu->kvm->arch.tdp_mmu_pages);
-		// spin_unlock(&vcpu->kvm->arch.tdp_mmu_pages_lock);
-		// printk("remapped pfn = %llx gpa = %llx hva = %lx\n", pfn, gpa, hva);
-		// bypass_counter++;
+		// kvm_tdp_mmu_walk_lockless_begin();
+		// ept_sptep = kvm_tdp_mmu_fast_pf_get_last_sptep(vcpu, gpa, &ept_spte);
+		// printk("bypass alloc success: epte = %llx\n", *ept_sptep);
+		// kvm_tdp_mmu_walk_lockless_end();
+		// kvm_flush_remote_tlbs_with_address(vcpu->kvm, gpa >> 12, 1);
 		did_map = true;
 		iowrite64(0, &ept_bypass_maps[PFN_CACHE][ept_user_map_index]);
 		iowrite64(0, &ept_bypass_maps[PFN_CACHE][ept_user_map_index + 4096]);
 		ept_user_map_index = (ept_user_map_index + 1) % 4096;
-		// if (bypass_counter % 1000 == 0)
-			// printk("bypass_counter = %u\n", bypass_counter);
 	}
 	return did_map;
 }
 
-
-static void setup_bypass_memslots(struct kvm_vcpu *vcpu) {
-	struct kvm *kvm = vcpu->kvm;
-	struct kvm_memory_slot *memslot;
-	int i;
-	if (ept_bypass_maps[MEMSLOTS_BASE_GFNS] == NULL)
-		return;
-	mutex_lock(&kvm->slots_lock);
-	for (i = 0; i < kvm->memslots[0]->used_slots; i++) {
-		memslot = &kvm->memslots[0]->memslots[i];
-		iowrite64(memslot->base_gfn, &ept_bypass_maps[MEMSLOTS_BASE_GFNS][i]);
-		iowrite64(memslot->npages, &ept_bypass_maps[MEMSLOTS_NPAGES][i]);
-		iowrite64(memslot->userspace_addr, &ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][i]);
-	}
-	mutex_unlock(&kvm->slots_lock);
-}
 
 static fastpath_t vmx_vcpu_run(struct kvm_vcpu *vcpu)
 {
@@ -6828,20 +6779,14 @@ static fastpath_t vmx_vcpu_run(struct kvm_vcpu *vcpu)
 	
 
 	if (ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR] != NULL && vcpu->vcpu_id == 0) {
-		// printk("did_map_bypass_to_userspace = %d\n", did_map_bypass_to_userspace);
 		while (true) {
-			// struct kvm_mmu_page *sp;
 			kvm_pfn_t pfn;
 			gpa_t gpa;
 			struct page *page;
-			// if (vcpu->arch.mmu_page_header_cache.nobjs == 0) break;
-			// if (ioread64(ept_bypass_maps + ept_bypass_index) != 0)
-				// break;
 			
 			gpa = (gpa_t)ioread64(&ept_bypass_maps[PFN_CACHE][ept_bypass_index]);
 			pfn = (kvm_pfn_t)ioread64(&ept_bypass_maps[PFN_CACHE][ept_bypass_index + 4096]);
 			if (pfn != (kvm_pfn_t)gpa || gpa != 0) {
-				// if (gpa != pfn) printk("Not allocating new pfns - some pfns still not mapped to user space\n");
 				break;
 			}
 
@@ -6853,28 +6798,14 @@ static fastpath_t vmx_vcpu_run(struct kvm_vcpu *vcpu)
 			}
 			// printk("got page\n");
 			pfn = page_to_pfn(page);
-			// printk("got pfn = %llu\n",pfn);
-			// sp = kvm_mmu_memory_cache_alloc(&vcpu->arch.mmu_page_header_cache);
-			// sp->spt = kvm_mmu_memory_cache_alloc(&vcpu->arch.mmu_shadow_page_cache);
-			// set_page_private(virt_to_page(sp->spt), (unsigned long)sp);
-			// sp->spt = (u64*)virt_to_phys(sp->spt);
-
-			// sp->role.word = 0;
-			// sp->gfn = 0;
-			// sp->tdp_mmu_page = true;
-
-			// phys_addr = virt_to_phys((void *)sp);[]
-			// printk("writing pfn to addr %p", &(ept_bypass_maps[PFN_CACHE][ept_bypass_index]));
 			iowrite64((u64)pfn, &(ept_bypass_maps[PFN_CACHE][ept_bypass_index])); // store pa for top half of ept-fault (handeled in L0)
-			// printk("writing pfn to addr %p", &(ept_bypass_maps[PFN_CACHE][ept_bypass_index + 4096]));
 			iowrite64((u64)pfn, &(ept_bypass_maps[PFN_CACHE][ept_bypass_index + 4096])); // store pa for bottom half of ept-fault (handeled above)
-			// printk("ept_bypass_maps[PFN_CACHE][%u] = %p\n", ept_bypass_index, (void*)ioread64(&ept_bypass_maps[PFN_CACHE][ept_bypass_index]));
 			ept_bypass_index = (ept_bypass_index + 1) % 4096;
 			allocated = true;
 		}
-		if (allocated) {
-			printk("ept_bypass_map_index = %u; ept_bypass_counter = %u\n", ept_bypass_index, bypass_counter);
-		}
+		// if (allocated) {
+		// 	printk("ept_bypass_map_index = %u; ept_bypass_counter = %u\n", ept_bypass_index, bypass_counter);
+		// }
 	}
 
 
@@ -7030,9 +6961,9 @@ static fastpath_t vmx_vcpu_run(struct kvm_vcpu *vcpu)
 	}
 
 	did_map_bypass_to_userspace = map_bypass_to_user_space(vcpu);
-	if (did_map_bypass_to_userspace) {
-		printk("did_map_bypass_to_userspace = %d\n", did_map_bypass_to_userspace);
-	}
+	// if (did_map_bypass_to_userspace) {
+	// 	printk("did_map_bypass_to_userspace = %d\n", did_map_bypass_to_userspace);
+	// }
 
 	vmx->idt_vectoring_info = 0;
 
