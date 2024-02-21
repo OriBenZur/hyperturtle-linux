@@ -674,10 +674,8 @@ retry_walk:
 	/* Convert to ACC_*_MASK flags for struct guest_walker.  */
 	walker->pte_access = FNAME(gpte_access)(pte_access ^ walk_nx_mask);
 	errcode = permission_fault(vcpu, mmu, walker->pte_access, pte_pkey, access);
-	if (unlikely(errcode)) {
-		printk("got error permission_fault\n");
+	if (unlikely(errcode))
 		goto error;
-	}
 
 	gfn = gpte_to_gfn_lvl(pte, walker->level);
 	gfn += (addr & PT_LVL_OFFSET_MASK(walker->level)) >> PAGE_SHIFT;
@@ -686,10 +684,8 @@ retry_walk:
 		gfn += pse36_gfn_delta(pte);
 
 	real_gpa = mmu->translate_gpa(vcpu, gfn_to_gpa(gfn), access, &walker->fault);
-	if (real_gpa == UNMAPPED_GVA) {
-		printk("got UNMAPPED_GVA no error\n");
+	if (real_gpa == UNMAPPED_GVA)
 		return 0;
-	}
 
 	walker->gfn = real_gpa >> PAGE_SHIFT;
 
@@ -707,10 +703,8 @@ retry_walk:
 	if (unlikely(!accessed_dirty)) {
 		ret = FNAME(update_accessed_dirty_bits)(vcpu, mmu, walker,
 							addr, write_fault);
-		if (unlikely(ret < 0)) {
-			printk("got error update_accessed_dirty_bits\n");
+		if (unlikely(ret < 0))
 			goto error;
-		}
 		else if (ret)
 			goto retry_walk;
 	}

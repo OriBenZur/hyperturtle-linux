@@ -6643,11 +6643,11 @@ static int setup_ept_bypass_maps(struct kvm *kvm) {
 		if (ept_bypass_maps[pdev->bus->number - MAPS_DEV_OFFSET] != NULL)
 			continue;
 	
-		printk("%04x:%02x:%02x.%d\n",
-			pci_domain_nr(pdev->bus),
-			pdev->bus->number,
-			PCI_SLOT(pdev->devfn),
-			PCI_FUNC(pdev->devfn));
+		// printk("%04x:%02x:%02x.%d\n",
+		// 	pci_domain_nr(pdev->bus),
+		// 	pdev->bus->number,
+		// 	PCI_SLOT(pdev->devfn),
+		// 	PCI_FUNC(pdev->devfn));
 		
 		if (pdev->bus->number < MAPS_DEV_OFFSET || pdev->bus->number >= N_BYPASS_MAPS + MAPS_DEV_OFFSET) {
 			printk("invalid bus number %d\n", pdev->bus->number);
@@ -6669,17 +6669,29 @@ static int setup_ept_bypass_maps(struct kvm *kvm) {
 	return i == 5 ? 0 : -1;
 }
 
+static void cleanup_ept_bypass_maps(void) {
+	int i;
+	for (i = 0; i < N_COUNTERS; i++) {
+		iowrite64(0, &ept_bypass_maps[COUNTERS][i]);
+	}
+	
+	for (i = 0; i < N_BYPASS_MAPS; i++) {
+		if (ept_bypass_maps[i] != NULL) {
+			pci_iounmap(pci_get_device(0x1af4, 0x1110, NULL), ept_bypass_maps[i]);
+			ept_bypass_maps[i] = NULL;
+		}
+	}
+	hyperupcall_vcpu = NULL;
+}
 
-static bool map_bypass_to_user_space(struct kvm_vcpu *vcpu) {
+
+static bool map_bypass_allocations_to_user_space(struct kvm_vcpu *vcpu) {
 	bool did_map = false;
 	int r = 0;
 	static int ept_user_map_index = 0;
 	if (ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR] == NULL || vcpu->vcpu_id != 0)
 		return false;
 	while(true) {
-		// u64 ept_spte;
-		// u64 *ept_sptep;
-
 		gpa_t gpa;
 		kvm_pfn_t pfn, old_pfn;
 		pte_t *ptep;
@@ -6688,6 +6700,8 @@ static bool map_bypass_to_user_space(struct kvm_vcpu *vcpu) {
 		unsigned long hva;
 		struct vm_area_struct *vma;
 		spinlock_t *ptl;
+		// u64 ept_spte;
+		// u64 *ept_sptep;
 
 		
 		gpa = (gpa_t)ioread64(&ept_bypass_maps[PFN_CACHE][ept_user_map_index]);
@@ -6712,7 +6726,6 @@ static bool map_bypass_to_user_space(struct kvm_vcpu *vcpu) {
 
 		if (!vma || hva < vma->vm_start || hva >= vma->vm_end) {
 			printk("Invalid user address\n");
-			up_write(&current->mm->mmap_lock);
 			mmap_write_unlock(current->mm);
 			break;
 		}
@@ -6720,7 +6733,7 @@ static bool map_bypass_to_user_space(struct kvm_vcpu *vcpu) {
 		ptep = get_locked_pte(current->mm, hva, &ptl);
 		if (pte_present(*ptep)) {
 			orig_pte = *ptep;
-			// printk("orig_pte: %lx\n", orig_pte.pte);
+			printk("orig_pte: %lx\n", orig_pte.pte);
 			old_pfn = pte_pfn(orig_pte);
 			pte_clear(current->mm, hva, ptep);
 		}
@@ -6767,7 +6780,7 @@ static fastpath_t vmx_vcpu_run(struct kvm_vcpu *vcpu)
 
 	if (unlikely(x86_hyper_type == X86_HYPER_KVM && (ept_bypass_maps[PFN_CACHE] == NULL || ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR] == NULL || hyperupcall_vcpu != vcpu) && vcpu->vcpu_id == 0)) {
 		if (setup_ept_bypass_maps(vcpu->kvm) < 0) {
-			// printk("setup_ept_bypass_maps failed\n");
+			printk("setup_ept_bypass_maps failed\n");
 		}
 
 		if (ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR] != NULL) {
@@ -6960,10 +6973,10 @@ static fastpath_t vmx_vcpu_run(struct kvm_vcpu *vcpu)
 		vmx->nested.nested_run_pending = 0;
 	}
 
-	did_map_bypass_to_userspace = map_bypass_to_user_space(vcpu);
-	// if (did_map_bypass_to_userspace) {
-	// 	printk("did_map_bypass_to_userspace = %d\n", did_map_bypass_to_userspace);
-	// }
+	did_map_bypass_to_userspace = map_bypass_allocations_to_user_space(vcpu);
+		// if (did_map_bypass_to_userspace) {
+		// 	printk("did_map_bypass_to_userspace = %d\n", did_map_bypass_to_userspace);
+		// }
 
 	vmx->idt_vectoring_info = 0;
 
@@ -6997,13 +7010,33 @@ static fastpath_t vmx_vcpu_run(struct kvm_vcpu *vcpu)
 
 static void vmx_free_vcpu(struct kvm_vcpu *vcpu)
 {
+	int i = 0;
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
+
+	map_bypass_allocations_to_user_space(vcpu);
+	if (ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR] != NULL && vcpu->vcpu_id == 0) {
+		for (i = 0; i < 4096; i++) {
+			kvm_pfn_t pfn;
+			gpa_t gpa;
+			
+			pfn = (kvm_pfn_t)ioread64(&ept_bypass_maps[PFN_CACHE][i + 4096]);
+			gpa = (gpa_t)ioread64(&ept_bypass_maps[PFN_CACHE][i]);
+			if (pfn == 0) {
+				continue;
+			}
+			__free_pages(pfn_to_page(pfn), 0);
+			iowrite64(0ULL, &(ept_bypass_maps[PFN_CACHE][i])); // store pa for bottom half of ept-fault (handeled above)
+			iowrite64(0ULL, &(ept_bypass_maps[PFN_CACHE][i + 4096])); // store pa for bottom half of ept-fault (handeled above)
+		}
+	}
+	cleanup_ept_bypass_maps();
 
 	if (enable_pml)
 		vmx_destroy_pml_buffer(vmx);
 	free_vpid(vmx->vpid);
 	nested_vmx_free_vcpu(vcpu);
 	free_loaded_vmcs(vmx->loaded_vmcs);
+
 }
 
 static int vmx_create_vcpu(struct kvm_vcpu *vcpu)

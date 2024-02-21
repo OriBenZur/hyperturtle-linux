@@ -5379,17 +5379,14 @@ void kvm_mmu_invalidate_gva(struct kvm_vcpu *vcpu, struct kvm_mmu *mmu,
 			    gva_t gva, hpa_t root_hpa)
 {
 	int i;
-	printk("kvm_mmu_invalidate_gva is guest mode: %d\n", (bool)(vcpu->arch.hflags & HF_GUEST_MASK));
 	/* It's actually a GPA for vcpu->arch.guest_mmu.  */
 	if (mmu != &vcpu->arch.guest_mmu) {
-		printk("in here\n");
 		/* INVLPG on a non-canonical address is a NOP according to the SDM.  */
 		if (is_noncanonical_address(gva, vcpu))
 			return;
 
 		static_call(kvm_x86_tlb_flush_gva)(vcpu, gva);
 	}
-	printk("in here2\n");
 
 	if (!mmu->invlpg)
 		return;
