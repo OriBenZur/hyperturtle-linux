@@ -84,6 +84,7 @@
 
 #include "mmu/mmu_internal.h"
 #include "mmu/tdp_mmu.h"
+#include "mmu/spte.h"
 
 #define CREATE_TRACE_POINTS
 #include "trace.h"
@@ -8892,6 +8893,10 @@ struct kvm_vcpu *hyperupcall_vcpu = NULL;
 EXPORT_SYMBOL_GPL(hyperupcall_vcpu);
 unsigned int bypass_counter = 0;
 EXPORT_SYMBOL_GPL(bypass_counter);
+u64 pfn_cache_size = 0;
+EXPORT_SYMBOL_GPL(pfn_cache_size);
+u32 pfn_cache_n_free_slots = 0;
+EXPORT_SYMBOL_GPL(pfn_cache_n_free_slots);
 
 int kvm_emulate_hypercall(struct kvm_vcpu *vcpu)
 {
@@ -9018,7 +9023,7 @@ int kvm_emulate_hypercall(struct kvm_vcpu *vcpu)
 			ret = -1;
 			break;
 		}
-		pfn = (u64)ioread64(&ept_bypass_maps[PFN_CACHE][bypass_counter % 4096]);
+		pfn = (u64)ioread64(&ept_bypass_maps[PFN_CACHE][bypass_counter % pfn_cache_size]);
 		write_lock(&vcpu->kvm->mmu_lock);
 		// if (kvm_unmap_gfn_range(vcpu->kvm, &range)) {
 			kvm_flush_remote_tlbs_with_address(vcpu->kvm, gpa >> 12, 1);
@@ -9029,7 +9034,7 @@ int kvm_emulate_hypercall(struct kvm_vcpu *vcpu)
 		*sptep = (pfn << 12) | 0x600000000000B77ULL;
 		write_unlock(&vcpu->kvm->mmu_lock);
 		// kvm_tdp_mmu_walk_lockless_end();
-		iowrite64(gpa, &ept_bypass_maps[PFN_CACHE][bypass_counter++ % 4096]);
+		iowrite64(gpa, &ept_bypass_maps[PFN_CACHE][bypass_counter++ % pfn_cache_size]);
 		ret = 0;
 		break;
 	}
@@ -9750,6 +9755,101 @@ void __kvm_request_immediate_exit(struct kvm_vcpu *vcpu)
 }
 EXPORT_SYMBOL_GPL(__kvm_request_immediate_exit);
 
+
+/*
+* Call with mmap_write_lock(current->mm);
+*/
+bool map_bypass_allocations_to_user_space(struct kvm_vcpu *vcpu) {
+	int n_mappings = 0;
+	int r = 0;
+	static int ept_user_map_index = 0;
+	if (ept_bypass_maps[PFN_CACHE] == NULL || vcpu->vcpu_id != 0 || pfn_cache_size == 0)
+		return false;
+	mmap_write_lock(current->mm);
+	while(true) {
+		gpa_t gpa;
+		kvm_pfn_t pfn, old_pfn;
+		pte_t *ptep;
+		pte_t orig_pte, new_pte;
+		u64 pte_delta;
+		unsigned long hva;
+		struct vm_area_struct *vma;
+		struct kvm_memory_slot *slot;
+		spinlock_t *ptl;
+		u64 ept_spte;
+		u64 *ept_sptep;
+
+		
+		gpa = (gpa_t)ioread64(&ept_bypass_maps[PFN_CACHE][ept_user_map_index]);
+		pfn = (kvm_pfn_t)ioread64(&ept_bypass_maps[PFN_CACHE][ept_user_map_index + pfn_cache_size]);
+		if (pfn == (kvm_pfn_t)gpa || pfn  == 0) {
+			break;
+		}
+		// printk("attaching pfn = %llx gpa = %llx\n", pfn, gpa);
+		kvm_tdp_mmu_walk_lockless_begin();
+		ept_sptep = kvm_tdp_mmu_fast_pf_get_last_sptep(vcpu, gpa, &ept_spte);
+		// printk("bypass alloc success: epte = %llx\n", *ept_sptep);
+		kvm_tdp_mmu_walk_lockless_end();
+		// tdp_mmu_link_page(vcpu->kvm, sp,
+		// 				  fault->huge_page_disallowed &&
+		// 				  fault->req_level >= iter.level);
+		slot = kvm_vcpu_gfn_to_memslot(vcpu, gpa >> PAGE_SHIFT);
+		hva = (unsigned long)(slot->userspace_addr + ((gpa >> PAGE_SHIFT) - slot->base_gfn) * PAGE_SIZE);
+		if (kvm_is_error_hva(hva)) {
+			printk("kvm_is_error_hva failed %p\n", (void*)hva);
+			// mmap_write_unlock(current->mm);
+			break;
+		}
+		vma = find_vma(current->mm, hva);
+		if (vma == NULL) {
+			printk("find_vma failed\n");
+			// mmap_write_unlock(current->mm);
+			break;
+		}
+
+		if (!vma || hva < vma->vm_start || hva >= vma->vm_end) {
+			printk("Invalid user address\n");
+			// mmap_write_unlock(current->mm);
+			break;
+		}
+		
+		ptep = get_locked_pte(current->mm, hva, &ptl);
+		if (!pte_present(*ptep) || pte_pfn(*ptep) != ((ept_spte & PT64_BASE_ADDR_MASK) >> PAGE_SHIFT)) {
+			orig_pte = *ptep;
+			// printk("gpa: %llx orig_pte: %lx\n ptep: %lx", gpa, orig_pte.pte, __pa(ptep));
+			old_pfn = pte_pfn(orig_pte);
+			pte_clear(current->mm, hva, ptep);
+			pte_unmap_unlock(ptep, ptl);
+
+			// printk("got hva: %lx\n", hva);
+			r = vm_insert_page(vma, hva, pfn_to_page(pfn));
+			if (r < 0) {
+				// printk("remap_pfn_range failed: %d. hva = %lx pfn = %llx\n", r, hva, pfn);
+				break;	
+			}
+
+			ptep = get_locked_pte(current->mm, hva, &ptl);
+			ptep->pte |= 0x842; // writeable, dirty, and SW dirty
+			new_pte = *ptep;
+			pte_delta = (new_pte.pte ^ pfn << 12) ^ (orig_pte.pte ^ (old_pfn << 12));
+			// if (pte_delta) {
+			// 	printk("dorig_pte: %lx, new_pte: %lx, pte_delta: %llx, hva: %lx\n", orig_pte.pte, new_pte.pte, pte_delta, hva);
+			// }
+			// printk("bypass alloc success: pte = %lx, pfn = %llx, gpa = %llx, hva = %lx\n", ptep->pte, pfn, gpa, hva);
+			pte_unmap_unlock(ptep, ptl);
+			// kvm_flush_remote_tlbs_with_address(vcpu->kvm, gpa >> 12, 1);
+			n_mappings++;
+		}
+		iowrite64(0, &ept_bypass_maps[PFN_CACHE][ept_user_map_index]);
+		iowrite64(0, &ept_bypass_maps[PFN_CACHE][ept_user_map_index + pfn_cache_size]);
+		ept_user_map_index = (ept_user_map_index + 1) % pfn_cache_size;
+	}
+	mmap_write_unlock(current->mm);
+	return n_mappings;
+}
+EXPORT_SYMBOL_GPL(map_bypass_allocations_to_user_space);
+
+
 /*
  * Returns 1 to let vcpu_run() continue the guest execution loop without
  * exiting to the userspace.  Otherwise, the value will be returned to the
@@ -9758,10 +9858,12 @@ EXPORT_SYMBOL_GPL(__kvm_request_immediate_exit);
 static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 {
 	int r;
+	bool hyperupcall_took_mm_lock = false;
 	bool req_int_win =
 		dm_request_for_irq_injection(vcpu) &&
 		kvm_cpu_accept_dm_intr(vcpu);
 	fastpath_t exit_fastpath;
+	static bool did_map_bypass_to_userspace = false;
 
 	bool req_immediate_exit = false;
 
@@ -9928,7 +10030,11 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	if (unlikely(r)) {
 		goto cancel_injection;
 	}
-
+	// if (hyperupcall_vcpu != NULL && ept_bypass_maps[COUNTERS][BYPASS_ALLOC_ENABLE] != 0) {
+		// mmap_write_lock(current->mm);
+		hyperupcall_took_mm_lock = true;
+		// printk("mmap_write_lock\n");
+	// }
 	preempt_disable();
 
 	static_call(kvm_x86_prepare_guest_switch)(vcpu);
@@ -9971,6 +10077,14 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 		smp_wmb();
 		local_irq_enable();
 		preempt_enable();
+		if (hyperupcall_vcpu != NULL && hyperupcall_took_mm_lock) {
+			// mmap_write_lock(current->mm);
+			// printk("mmap_write_lock\n");
+			did_map_bypass_to_userspace = map_bypass_allocations_to_user_space(vcpu);
+			hyperupcall_took_mm_lock = false;
+			// printk("mmap_write_unlock\n");
+			// mmap_write_unlock(current->mm);
+		}
 		vcpu->srcu_idx = srcu_read_lock(&vcpu->kvm->srcu);
 		r = 1;
 		goto cancel_injection;
@@ -10078,8 +10192,16 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 		}
 	}
 
+	// if (hyperupcall_vcpu != NULL && hyperupcall_took_mm_lock && rwsem_is_locked(&current->mm->mmap_lock)) {
 	local_irq_enable();
 	preempt_enable();
+	if (hyperupcall_vcpu != NULL && hyperupcall_took_mm_lock) {
+		// mmap_write_lock(current->mm);
+		did_map_bypass_to_userspace = map_bypass_allocations_to_user_space(vcpu);
+		hyperupcall_took_mm_lock = false;
+		// mmap_write_unlock(current->mm);
+		// printk("mmap_write_unlock\n");
+	}
 
 	vcpu->srcu_idx = srcu_read_lock(&vcpu->kvm->srcu);
 

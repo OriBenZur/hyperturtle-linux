@@ -6626,6 +6626,8 @@ static noinstr void vmx_vcpu_enter_exit(struct kvm_vcpu *vcpu,
 }
 
 extern u32 ept_bypass_index;
+extern u64 pfn_cache_size;
+extern u64 pfn_cache_n_free_slots;
 extern u64 __iomem *ept_bypass_maps[N_BYPASS_MAPS];
 extern struct kvm_vcpu *hyperupcall_vcpu;
 extern unsigned int bypass_counter;
@@ -6656,23 +6658,39 @@ static int setup_ept_bypass_maps(struct kvm *kvm) {
 
 		bar_len = pci_resource_len(pdev, 2);
 		ept_bypass_maps[pdev->bus->number - MAPS_DEV_OFFSET] = pci_iomap(pdev, 2, bar_len);
+		if ((pdev->bus->number - MAPS_DEV_OFFSET) == COUNTERS) {
+			pfn_cache_size = ept_bypass_maps[COUNTERS][PFN_CACHE_SIZE_KEY];
+			pfn_cache_n_free_slots = pfn_cache_size;
+
+			printk("pfn_cache_size: %llu\n", pfn_cache_size);
+		}
 		printk("map bar len %llx\n", bar_len);
 	}
 	// mutex_lock(&kvm->slots_lock);
 	// for (i = 0; i < kvm->memslots[0]->used_slots; i++) {
-	// 	struct kvm_memory_slot *memslot = &kvm->memslots[0]->memslots[i];
+	// 	struct kvm_memory_slot *memslot = &kvm->memslo	ts[0]->memslots[i];
 	// 	ept_bypass_maps[MEMSLOTS_BASE_GFNS][i] = memslot->base_gfn;
 	// 	ept_bypass_maps[MEMSLOTS_NPAGES][i] = memslot->npages;
 	// 	ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][i] = memslot->userspace_addr;
 	// }
 	// mutex_unlock(&kvm->slots_lock);
-	return i == 5 ? 0 : -1;
+	return i;
 }
 
 static void cleanup_ept_bypass_maps(void) {
 	int i;
 	for (i = 0; i < N_COUNTERS; i++) {
+		if (i == PFN_CACHE_SIZE_KEY)
+			continue;
+		printk("ept_bypass_maps[%d] = %llx\n", i, ept_bypass_maps[COUNTERS][i]);
 		iowrite64(0, &ept_bypass_maps[COUNTERS][i]);
+	}
+	for (i = 0; i < HYPERUPCALL_MAX_N_MEMSLOTS; i++) {
+		if (ept_bypass_maps[MEMSLOTS_NPAGES][i] != 0) printk("base_gfn[%d] = %llx npages[%d] = %llx userspace_addr[%d] = %llx\n", i, ept_bypass_maps[MEMSLOTS_BASE_GFNS][i], i, ept_bypass_maps[MEMSLOTS_NPAGES][i], i, ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][i]);
+		iowrite64(0, &ept_bypass_maps[MEMSLOTS_BASE_GFNS][i]);
+		iowrite64(0, &ept_bypass_maps[MEMSLOTS_NPAGES][i]);
+		iowrite64(0, &ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][i]);
+		// iowrite64(0, &ept_bypass_maps[MEMSLOTS_FLAGS][i]);
 	}
 	
 	for (i = 0; i < N_BYPASS_MAPS; i++) {
@@ -6682,91 +6700,39 @@ static void cleanup_ept_bypass_maps(void) {
 		}
 	}
 	hyperupcall_vcpu = NULL;
+	pfn_cache_size = 0;
 }
 
-
-static bool map_bypass_allocations_to_user_space(struct kvm_vcpu *vcpu) {
-	bool did_map = false;
-	int r = 0;
-	static int ept_user_map_index = 0;
-	if (ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR] == NULL || vcpu->vcpu_id != 0)
-		return false;
-	while(true) {
+noinline static int topup_bypass_allocation_cache(void) {
+	int n_allocations;
+	gfp_t gfp = GFP_KERNEL_ACCOUNT | __GFP_ZERO | GFP_USER;
+	if (ept_bypass_maps[PFN_CACHE] == NULL || pfn_cache_size == 0)
+		return;
+	while (true) {
+		kvm_pfn_t pfn;
 		gpa_t gpa;
-		kvm_pfn_t pfn, old_pfn;
-		pte_t *ptep;
-		pte_t orig_pte, new_pte;
-		u64 pte_delta;
-		unsigned long hva;
-		struct vm_area_struct *vma;
-		spinlock_t *ptl;
-		// u64 ept_spte;
-		// u64 *ept_sptep;
-
+		struct page *page;
 		
-		gpa = (gpa_t)ioread64(&ept_bypass_maps[PFN_CACHE][ept_user_map_index]);
-		pfn = (kvm_pfn_t)ioread64(&ept_bypass_maps[PFN_CACHE][ept_user_map_index + 4096]);
-		if (pfn == (kvm_pfn_t)gpa || pfn  == 0) {
+		gpa = (gpa_t)ioread64(&ept_bypass_maps[PFN_CACHE][ept_bypass_index]);
+		pfn = (kvm_pfn_t)ioread64(&ept_bypass_maps[PFN_CACHE][ept_bypass_index + pfn_cache_size]);
+		if (pfn != (kvm_pfn_t)gpa || gpa != 0) {
 			break;
 		}
-		// printk("attaching pfn = %llx gpa = %llx\n", pfn, gpa);
-		mmap_write_lock(current->mm);
-		hva = (unsigned long)kvm_vcpu_gfn_to_hva(vcpu, gpa_to_gfn(gpa));
-		if (kvm_is_error_hva(hva)) {
-			printk("kvm_is_error_hva failed %p\n", (void*)hva);
-			mmap_write_unlock(current->mm);
+		gfp |= (pfn_cache_n_free_slots >= 8 ? __GFP_NORETRY : 0);
+		// printk("allocating frame\n");
+		page = alloc_page(gfp);
+		if (page == NULL) {
+			printk("alloc_page failed\n");
 			break;
 		}
-		vma = find_vma(current->mm, hva);
-		if (vma == NULL) {
-			printk("find_vma failed\n");
-			mmap_write_unlock(current->mm);
-			break;
-		}
-
-		if (!vma || hva < vma->vm_start || hva >= vma->vm_end) {
-			printk("Invalid user address\n");
-			mmap_write_unlock(current->mm);
-			break;
-		}
-		
-		ptep = get_locked_pte(current->mm, hva, &ptl);
-		if (pte_present(*ptep)) {
-			orig_pte = *ptep;
-			printk("orig_pte: %lx\n", orig_pte.pte);
-			old_pfn = pte_pfn(orig_pte);
-			pte_clear(current->mm, hva, ptep);
-		}
-		pte_unmap_unlock(ptep, ptl);
-
-		// printk("got hva: %lx\n", hva);
-		r = vm_insert_page(vma, hva, pfn_to_page(pfn));
-		mmap_write_unlock(current->mm);
-		if (r < 0) {
-			// printk("remap_pfn_range failed: %d. hva = %lx pfn = %llx\n", r, hva, pfn);
-			break;
-		}
-
-		ptep = get_locked_pte(current->mm, hva, &ptl);
-		ptep->pte |= 0x842; // writeable, dirty, and SW dirty
-		new_pte = *ptep;
-		pte_delta = (new_pte.pte ^ pfn << 12) ^ (orig_pte.pte ^ (old_pfn << 12));
-		// if (pte_delta) {
-		// 	printk("dorig_pte: %lx, new_pte: %lx, pte_delta: %llx, hva: %lx\n", orig_pte.pte, new_pte.pte, pte_delta, hva);
-		// }
-		// printk("bypass alloc success: pte = %lx, pfn = %llx, gpa = %llx, hva = %lx\n", ptep->pte, pfn, gpa, hva);
-		pte_unmap_unlock(ptep, ptl);
-		// kvm_tdp_mmu_walk_lockless_begin();
-		// ept_sptep = kvm_tdp_mmu_fast_pf_get_last_sptep(vcpu, gpa, &ept_spte);
-		// printk("bypass alloc success: epte = %llx\n", *ept_sptep);
-		// kvm_tdp_mmu_walk_lockless_end();
-		// kvm_flush_remote_tlbs_with_address(vcpu->kvm, gpa >> 12, 1);
-		did_map = true;
-		iowrite64(0, &ept_bypass_maps[PFN_CACHE][ept_user_map_index]);
-		iowrite64(0, &ept_bypass_maps[PFN_CACHE][ept_user_map_index + 4096]);
-		ept_user_map_index = (ept_user_map_index + 1) % 4096;
+		// printk("got page\n");
+		pfn = page_to_pfn(page);
+		iowrite64((u64)pfn, &(ept_bypass_maps[PFN_CACHE][ept_bypass_index])); // store pa for top half of ept-fault (handeled in L0)
+		iowrite64((u64)pfn, &(ept_bypass_maps[PFN_CACHE][ept_bypass_index + pfn_cache_size])); // store pa for bottom half of ept-fault (handeled above)
+		ept_bypass_index = (ept_bypass_index + 1) % pfn_cache_size;
+		n_allocations++;
 	}
-	return did_map;
+	return n_allocations;
 }
 
 
@@ -6774,52 +6740,21 @@ static fastpath_t vmx_vcpu_run(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	unsigned long cr3, cr4;
-	bool allocated = false;
-	static bool did_map_bypass_to_userspace = false;
+	// int n_allocations = 0, i = 0;
+	// int initial_index = ept_bypass_index;
+	// static bool did_map_bypass_to_userspace = false;
 
 
 	if (unlikely(x86_hyper_type == X86_HYPER_KVM && (ept_bypass_maps[PFN_CACHE] == NULL || ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR] == NULL || hyperupcall_vcpu != vcpu) && vcpu->vcpu_id == 0)) {
-		if (setup_ept_bypass_maps(vcpu->kvm) < 0) {
-			printk("setup_ept_bypass_maps failed\n");
-		}
-
-		if (ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR] != NULL) {
+		if (setup_ept_bypass_maps(vcpu->kvm) && ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR] != NULL) {
 			setup_bypass_memslots(vcpu);
 			hyperupcall_vcpu = vcpu;
 			printk("setup_ept_bypass_maps success %p\n", ept_bypass_maps[PFN_CACHE]);
 		}
 	}
 	
-
-	if (ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR] != NULL && vcpu->vcpu_id == 0) {
-		while (true) {
-			kvm_pfn_t pfn;
-			gpa_t gpa;
-			struct page *page;
-			
-			gpa = (gpa_t)ioread64(&ept_bypass_maps[PFN_CACHE][ept_bypass_index]);
-			pfn = (kvm_pfn_t)ioread64(&ept_bypass_maps[PFN_CACHE][ept_bypass_index + 4096]);
-			if (pfn != (kvm_pfn_t)gpa || gpa != 0) {
-				break;
-			}
-
-			// printk("allocating frame\n");
-			page = alloc_page(GFP_KERNEL_ACCOUNT | __GFP_ZERO | GFP_USER);
-			if (page == NULL) {
-				printk("alloc_page failed\n");
-				break;
-			}
-			// printk("got page\n");
-			pfn = page_to_pfn(page);
-			iowrite64((u64)pfn, &(ept_bypass_maps[PFN_CACHE][ept_bypass_index])); // store pa for top half of ept-fault (handeled in L0)
-			iowrite64((u64)pfn, &(ept_bypass_maps[PFN_CACHE][ept_bypass_index + 4096])); // store pa for bottom half of ept-fault (handeled above)
-			ept_bypass_index = (ept_bypass_index + 1) % 4096;
-			allocated = true;
-		}
-		// if (allocated) {
-		// 	printk("ept_bypass_map_index = %u; ept_bypass_counter = %u\n", ept_bypass_index, bypass_counter);
-		// }
-	}
+	if (vcpu->vcpu_id == 0)
+		topup_bypass_allocation_cache();
 
 
 	/* Record the guest's net vcpu time for enforced NMI injections. */
@@ -6953,7 +6888,7 @@ static fastpath_t vmx_vcpu_run(struct kvm_vcpu *vcpu)
 	 */
 	loadsegment(ds, __USER_DS);
 	loadsegment(es, __USER_DS);
-#endif
+#endif	
 
 	vmx_register_cache_reset(vcpu);
 
@@ -6973,7 +6908,6 @@ static fastpath_t vmx_vcpu_run(struct kvm_vcpu *vcpu)
 		vmx->nested.nested_run_pending = 0;
 	}
 
-	did_map_bypass_to_userspace = map_bypass_allocations_to_user_space(vcpu);
 		// if (did_map_bypass_to_userspace) {
 		// 	printk("did_map_bypass_to_userspace = %d\n", did_map_bypass_to_userspace);
 		// }
@@ -7012,24 +6946,30 @@ static void vmx_free_vcpu(struct kvm_vcpu *vcpu)
 {
 	int i = 0;
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
-
-	map_bypass_allocations_to_user_space(vcpu);
-	if (ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR] != NULL && vcpu->vcpu_id == 0) {
-		for (i = 0; i < 4096; i++) {
+	if (ept_bypass_maps[PFN_CACHE] != NULL && vcpu->vcpu_id == 0) {
+		// printk("starting bypasses to user space\n");
+		// mmap_write_lock(current->mm);
+		// printk("freeing free pfn-cache\n");
+		// map_bypass_allocations_to_user_space(vcpu);
+		// printk("freeing free pfn-cache\n");
+		// mmap_write_unlock(current->mm);
+		printk("freeing free pfn-cache\n");
+		for (i = 0; i < pfn_cache_size; i++) {
 			kvm_pfn_t pfn;
 			gpa_t gpa;
 			
-			pfn = (kvm_pfn_t)ioread64(&ept_bypass_maps[PFN_CACHE][i + 4096]);
+			pfn = (kvm_pfn_t)ioread64(&ept_bypass_maps[PFN_CACHE][i + pfn_cache_size]);
 			gpa = (gpa_t)ioread64(&ept_bypass_maps[PFN_CACHE][i]);
 			if (pfn == 0) {
 				continue;
 			}
 			__free_pages(pfn_to_page(pfn), 0);
 			iowrite64(0ULL, &(ept_bypass_maps[PFN_CACHE][i])); // store pa for bottom half of ept-fault (handeled above)
-			iowrite64(0ULL, &(ept_bypass_maps[PFN_CACHE][i + 4096])); // store pa for bottom half of ept-fault (handeled above)
+			iowrite64(0ULL, &(ept_bypass_maps[PFN_CACHE][i + pfn_cache_size])); // store pa for bottom half of ept-fault (handeled above)
 		}
+		printk("cleanup_ept_bypass_maps\n");
+		cleanup_ept_bypass_maps();
 	}
-	cleanup_ept_bypass_maps();
 
 	if (enable_pml)
 		vmx_destroy_pml_buffer(vmx);
@@ -8190,7 +8130,7 @@ module_exit(vmx_exit);
 static int __init vmx_init(void)
 {
 	int r, cpu;
-
+	printk("pages addr: %lx\n", __pa(pfn_to_page(0)));
 #if IS_ENABLED(CONFIG_HYPERV)
 	/*
 	 * Enlightened VMCS usage should be recommended and the host needs

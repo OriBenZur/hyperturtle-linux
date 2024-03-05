@@ -1794,21 +1794,41 @@ out_bitmap:
 EXPORT_SYMBOL_GPL(__kvm_set_memory_region);
 
 extern u64 __iomem *ept_bypass_maps[N_BYPASS_MAPS];
+static void update_bypass_memslots(struct kvm_vcpu *vcpu) {
+	int i;
+	struct kvm *kvm = vcpu->kvm;
+	struct kvm_memslots *slots;
+	struct kvm_memory_slot *slot;
+
+	if (ept_bypass_maps[MEMSLOTS_BASE_GFNS] == NULL || ept_bypass_maps[MEMSLOTS_NPAGES] == NULL || ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR] == NULL)
+		return;
+
+	// printk("update_bypass_memslots\n");
+	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
+		slots = __kvm_memslots(kvm, i);
+		// printk("slots->used_slots=%d\n", slots->used_slots);
+		kvm_for_each_memslot(slot, slots) {
+			int huc_map_slot = (slot->id & 0b111111) + (64*i);
+			// printk("slot->id=%d->%d, i*64 = %d*64 = %d\n", slot->id, slot->id & 0b111111, i, i*64);
+			// printk("huc_map_slot=%d\n", huc_map_slot);
+			iowrite64(slot->base_gfn, &ept_bypass_maps[MEMSLOTS_BASE_GFNS][huc_map_slot]);
+			// printk("slot->base_gfn=%llx\n", slot->base_gfn);
+			iowrite64(slot->npages, &ept_bypass_maps[MEMSLOTS_NPAGES][huc_map_slot]);
+			// printk("slot->npages=%lx\n", slot->npages);
+			iowrite64(slot->userspace_addr | slot->flags, &ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][huc_map_slot]);
+			// printk("slot->userspace_addr=%lx\n", slot->userspace_addr);
+		}
+	}
+}
+
 void setup_bypass_memslots(struct kvm_vcpu *vcpu) {
 	struct kvm *kvm = vcpu->kvm;
-	struct kvm_memory_slot *memslot;
-	int i;
-	if (ept_bypass_maps[MEMSLOTS_BASE_GFNS] == NULL)
+	if (ept_bypass_maps[MEMSLOTS_BASE_GFNS] == NULL || ept_bypass_maps[COUNTERS] == NULL)
 		return;
-	mutex_lock(&kvm->slots_lock);
-	for (i = 0; i < kvm->memslots[0]->used_slots; i++) {
-		memslot = &kvm->memslots[0]->memslots[i];
-		iowrite64(memslot->base_gfn, &ept_bypass_maps[MEMSLOTS_BASE_GFNS][i]);
-		iowrite64(memslot->npages, &ept_bypass_maps[MEMSLOTS_NPAGES][i]);
-		iowrite64(memslot->userspace_addr, &ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][i]);
-	}
-	mutex_unlock(&kvm->slots_lock);
 	iowrite64(read_cr3_pa(), &ept_bypass_maps[COUNTERS][QEMU_CR3]);
+	mutex_lock(&kvm->slots_lock);
+	update_bypass_memslots(vcpu);
+	mutex_unlock(&kvm->slots_lock);
 }
 EXPORT_SYMBOL_GPL(setup_bypass_memslots);
 
@@ -1816,21 +1836,17 @@ int kvm_set_memory_region(struct kvm *kvm,
 			  const struct kvm_userspace_memory_region *mem)
 {
 	int r;
-	// int i;
-	// struct kvm_memory_slot *memslot;
 
 	mutex_lock(&kvm->slots_lock);
 	r = __kvm_set_memory_region(kvm, mem);
-	if (ept_bypass_maps[MEMSLOTS_BASE_GFNS] != NULL && ept_bypass_maps[MEMSLOTS_NPAGES] != NULL && ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR] != NULL && (mem->slot >> 16) == 0) {
-		iowrite64(mem->guest_phys_addr >> 12, &ept_bypass_maps[MEMSLOTS_BASE_GFNS][(u16)mem->slot]);
-		iowrite64(mem->memory_size >> 12, &ept_bypass_maps[MEMSLOTS_NPAGES][(u16)mem->slot]);
-		iowrite64(mem->userspace_addr, &ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][(u16)mem->slot]);
-	}
+
+	update_bypass_memslots(kvm->vcpus[0]);
+
 	// printk(KERN_INFO "as_id=%d \n", mem->slot >> 16);
 	// for (i = 0; i < kvm->memslots[mem->slot >> 16]->used_slots; i++) {
 	// 	memslot = &kvm->memslots[mem->slot >> 16]->memslots[i];
-	// 	printk(KERN_INFO "memslot[%d]: base_gfn=%llx npages=%lx userspace_addr=%lx\n",
-	// 		i, memslot->base_gfn, memslot->npages, memslot->userspace_addr);
+	// 	printk(KERN_INFO "memslot[%d]: base_gfn=%llx npages=%lx userspace_addr=%lx\n flags=%x\n",
+	// 		i, memslot->base_gfn, memslot->npages, memslot->userspace_addr, memslot->flags);
 	// }
 	mutex_unlock(&kvm->slots_lock);
 	return r;

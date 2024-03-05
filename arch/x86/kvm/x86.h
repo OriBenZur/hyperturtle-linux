@@ -72,6 +72,9 @@ static __always_inline void kvm_guest_exit_irqoff(void)
 #define KVM_SVM_DEFAULT_PLE_WINDOW_MAX	USHRT_MAX
 #define KVM_SVM_DEFAULT_PLE_WINDOW	3000
 
+bool map_bypass_allocations_to_user_space(struct kvm_vcpu *vcpu);
+
+
 static inline unsigned int __grow_ple_window(unsigned int val,
 		unsigned int base, unsigned int modifier, unsigned int max)
 {

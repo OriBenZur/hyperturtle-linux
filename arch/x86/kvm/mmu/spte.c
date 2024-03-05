@@ -95,7 +95,7 @@ bool make_spte(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp,
 	       u64 old_spte, bool prefetch, bool can_unsync,
 	       bool host_writable, u64 *new_spte)
 {
-	int level = sp->role.level;
+	int level = sp->role.level, i = 0;
 	u64 spte = SPTE_MMU_PRESENT_MASK;
 	bool wrprot = false;
 	static int total_counter = 0;
@@ -217,6 +217,11 @@ out:
 		// printk("pte flags: %llx, counter: %d/%d", spte ^ ((u64)pfn << PAGE_SHIFT), no_host_writable_counter++, total_counter);
 	// }
 	total_counter++;
+	for (i = 0; i < vcpu->kvm->memslots[0]->used_slots; i++) {
+		if (vcpu->kvm->memslots[0]->memslots[i].base_gfn == slot->base_gfn)
+			break;
+	}
+	// printk("got spte: %llx, memslot: %d\n", spte, i);
 	return wrprot;
 }
 
