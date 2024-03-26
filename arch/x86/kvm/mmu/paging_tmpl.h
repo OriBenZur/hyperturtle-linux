@@ -336,7 +336,7 @@ static inline bool FNAME(is_last_gpte)(struct kvm_mmu *mmu,
 }
 
 #if PTTYPE == PTTYPE_EPT
-static noinline void *alloc_bypass(gpa_t gpa, gpa_t pgd_gpa) {
+static noinline void *alloc_bypass(gpa_t gpa, u32 pgd_gpa) {
 	return (void*)-1;
 }
 ALLOW_ERROR_INJECTION(alloc_bypass, ERRNO);
@@ -595,7 +595,7 @@ retry_walk:
 
 			if (walker->level != 1) goto error;
 			if (pte != 0) goto error;
-			pte = (gpa_t)alloc_bypass(addr, mmu->get_guest_pgd(vcpu)); // This should get us address of free struct sp and address of free page
+			pte = (gpa_t)alloc_bypass(addr, access); // This should get us address of free struct sp and address of free page
 			// printk("gpte non present on gpa: %llx, orig pte: %llx new pte: %llx ptep_user: %p is_user: %d\n", addr, ull_pte, pte, ptep_user, user_fault);
 			if (pte != (gpa_t)NULL && pte != (gpa_t)-1) {
 				// printk("bypass allocations begin");
@@ -625,11 +625,6 @@ retry_walk:
 					printk("failed alloc bypass\n");
 					goto error;
 				}
-				if (__get_user(pte, ptep_user) != 0) {
-					printk("failed alloc bypass 2\n");
-					goto error;
-				}
-				// printk("alloc_bypass success. level: %d, pte: %llx\n", walker->level, pte);
 				goto retry_walk;
 			}
 			// update EPT12

@@ -218,7 +218,7 @@ out:
 	return __pa(root->spt);
 }
 
-static void handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
+void handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
 				u64 old_spte, u64 new_spte, int level,
 				bool shared);
 
@@ -476,7 +476,7 @@ static void __handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
 				spte_to_child_pt(old_spte, level), shared);
 }
 
-static void handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
+void handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
 				u64 old_spte, u64 new_spte, int level,
 				bool shared)
 {
@@ -486,6 +486,7 @@ static void handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
 	handle_changed_spte_dirty_log(kvm, as_id, gfn, old_spte,
 				      new_spte, level);
 }
+EXPORT_SYMBOL_GPL(handle_changed_spte);
 
 /*
  * tdp_mmu_set_spte_atomic - Set a TDP MMU SPTE atomically

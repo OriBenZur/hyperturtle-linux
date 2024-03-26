@@ -94,23 +94,27 @@
 
 
 #define MAPS_DEV_OFFSET 5
-#define HYPERUPCALL_MAX_N_MEMSLOTS 32
+#define HYPERUPCALL_MAX_N_MEMSLOTS 128
 enum allocBypassMaps {
 	PFN_CACHE = 0,
 	COUNTERS,
 	MEMSLOTS_BASE_GFNS,
 	MEMSLOTS_NPAGES,
 	MEMSLOTS_USERSPACE_ADDR,
-	// MEMSLOTS_FLAGS,
-	SP_HEADERS,
+	NO_MAP_LIST,
 	N_BYPASS_MAPS
 };
 
-enum allocBypassCounter {
+enum counter_type {
     BYPASS_ALLOCS_INDEX = 0,
     BYPASS_ALLOC_ATTEMPS,
     BYPASS_ALLOC_SUCCESS,
     BYPASS_REMAP_SUCCESS,
+    BYPASS_ALLOC_FAILED_CACHE_EMPTY,
+    BYPASS_ALLOC_FAILED_CACHE_DIRTY_FULL,
+    BYPASS_ALLOC_FAILED_NO_MEMSLOT,
+    BYPASS_ALLOC_FAILED_CANT_REMAP,
+    BYPASS_ALLOC_FAILED_REACHED_MAX_ALLOCS,
     REMAP_UPDATE_SUCCESS0,
     REMAP_UPDATE_SUCCESS1,
     REMAP_UPDATE_SUCCESS2,
@@ -857,7 +861,7 @@ enum kvm_mr_change {
 	KVM_MR_MOVE,
 	KVM_MR_FLAGS_ONLY,
 };
-void setup_bypass_memslots(struct kvm_vcpu *vcpu);
+void setup_bypass_memslots(struct kvm *kvm);
 int kvm_set_memory_region(struct kvm *kvm,
 			  const struct kvm_userspace_memory_region *mem);
 int __kvm_set_memory_region(struct kvm *kvm,

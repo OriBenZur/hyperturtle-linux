@@ -83,6 +83,10 @@ extern void shmem_unlock_mapping(struct address_space *mapping);
 extern struct page *shmem_read_mapping_page_gfp(struct address_space *mapping,
 					pgoff_t index, gfp_t gfp_mask);
 extern void shmem_truncate_range(struct inode *inode, loff_t start, loff_t end);
+extern int shmem_replace_entry(struct address_space *mapping,
+			pgoff_t index, void *expected, void *replacement);
+extern int shmem_replace_page(struct page **pagep, gfp_t gfp,
+	struct shmem_inode_info *info, pgoff_t index, struct page *newpage);
 extern int shmem_unuse(unsigned int type, bool frontswap,
 		       unsigned long *fs_pages_to_unuse);
 

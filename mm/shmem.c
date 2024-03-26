@@ -407,7 +407,7 @@ void shmem_uncharge(struct inode *inode, long pages)
 /*
  * Replace item expected in xarray by a new item, while holding xa_lock.
  */
-static int shmem_replace_entry(struct address_space *mapping,
+int shmem_replace_entry(struct address_space *mapping,
 			pgoff_t index, void *expected, void *replacement)
 {
 	XA_STATE(xas, &mapping->i_pages, index);
@@ -421,6 +421,7 @@ static int shmem_replace_entry(struct address_space *mapping,
 	xas_store(&xas, replacement);
 	return 0;
 }
+EXPORT_SYMBOL_GPL(shmem_replace_entry);
 
 /*
  * Sometimes, before we decide whether to proceed or to fail, we must check
@@ -1631,10 +1632,10 @@ static bool shmem_should_replace_page(struct page *page, gfp_t gfp)
 	return page_zonenum(page) > gfp_zone(gfp);
 }
 
-static int shmem_replace_page(struct page **pagep, gfp_t gfp,
-				struct shmem_inode_info *info, pgoff_t index)
+int shmem_replace_page(struct page **pagep, gfp_t gfp,
+				struct shmem_inode_info *info, pgoff_t index, struct page *newpage)
 {
-	struct page *oldpage, *newpage;
+	struct page *oldpage;
 	struct folio *old, *new;
 	struct address_space *swap_mapping;
 	swp_entry_t entry;
@@ -1651,7 +1652,8 @@ static int shmem_replace_page(struct page **pagep, gfp_t gfp,
 	 * limit chance of success by further cpuset and node constraints.
 	 */
 	gfp &= ~GFP_CONSTRAINT_MASK;
-	newpage = shmem_alloc_page(gfp, info, index);
+	if (newpage == NULL)
+		newpage = shmem_alloc_page(gfp, info, index);
 	if (!newpage)
 		return -ENOMEM;
 
@@ -1700,6 +1702,7 @@ static int shmem_replace_page(struct page **pagep, gfp_t gfp,
 	put_page(oldpage);
 	return error;
 }
+EXPORT_SYMBOL_GPL(shmem_replace_page);
 
 /*
  * Swap in the page pointed to by *pagep.
@@ -1760,7 +1763,7 @@ static int shmem_swapin_page(struct inode *inode, pgoff_t index,
 	arch_swap_restore(swap, page);
 
 	if (shmem_should_replace_page(page, gfp)) {
-		error = shmem_replace_page(&page, gfp, info, index);
+		error = shmem_replace_page(&page, gfp, info, index, NULL);
 		if (error)
 			goto failed;
 	}

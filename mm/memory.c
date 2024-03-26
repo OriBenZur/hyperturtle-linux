@@ -3374,6 +3374,7 @@ void unmap_mapping_page(struct page *page)
 					 last_index, &details);
 	i_mmap_unlock_write(mapping);
 }
+EXPORT_SYMBOL_GPL(unmap_mapping_page);
 
 /**
  * unmap_mapping_pages() - Unmap pages from processes.

@@ -1109,6 +1109,8 @@ static struct kvm *kvm_create_vm(unsigned long type)
 	preempt_notifier_inc();
 	kvm_init_pm_notifier(kvm);
 
+	// setup_bypass_memslots(kvm);
+
 	return kvm;
 
 out_err:
@@ -1794,9 +1796,8 @@ out_bitmap:
 EXPORT_SYMBOL_GPL(__kvm_set_memory_region);
 
 extern u64 __iomem *ept_bypass_maps[N_BYPASS_MAPS];
-static void update_bypass_memslots(struct kvm_vcpu *vcpu) {
+static void update_bypass_memslots(struct kvm *kvm) {
 	int i;
-	struct kvm *kvm = vcpu->kvm;
 	struct kvm_memslots *slots;
 	struct kvm_memory_slot *slot;
 
@@ -1821,13 +1822,13 @@ static void update_bypass_memslots(struct kvm_vcpu *vcpu) {
 	}
 }
 
-void setup_bypass_memslots(struct kvm_vcpu *vcpu) {
-	struct kvm *kvm = vcpu->kvm;
+void setup_bypass_memslots(struct kvm *kvm) {
 	if (ept_bypass_maps[MEMSLOTS_BASE_GFNS] == NULL || ept_bypass_maps[COUNTERS] == NULL)
 		return;
-	iowrite64(read_cr3_pa(), &ept_bypass_maps[COUNTERS][QEMU_CR3]);
+	if (ioread64(&ept_bypass_maps[COUNTERS][QEMU_CR3]) == 0)
+		iowrite64(read_cr3_pa(), &ept_bypass_maps[COUNTERS][QEMU_CR3]);
 	mutex_lock(&kvm->slots_lock);
-	update_bypass_memslots(vcpu);
+	update_bypass_memslots(kvm);
 	mutex_unlock(&kvm->slots_lock);
 }
 EXPORT_SYMBOL_GPL(setup_bypass_memslots);
@@ -1836,11 +1837,13 @@ int kvm_set_memory_region(struct kvm *kvm,
 			  const struct kvm_userspace_memory_region *mem)
 {
 	int r;
+	// int i;
+	// struct kvm_memory_slot *memslot;
 
 	mutex_lock(&kvm->slots_lock);
 	r = __kvm_set_memory_region(kvm, mem);
 
-	update_bypass_memslots(kvm->vcpus[0]);
+	update_bypass_memslots(kvm);
 
 	// printk(KERN_INFO "as_id=%d \n", mem->slot >> 16);
 	// for (i = 0; i < kvm->memslots[mem->slot >> 16]->used_slots; i++) {
@@ -4352,12 +4355,13 @@ static long kvm_vm_ioctl(struct file *filp,
 	}
 	case KVM_SET_USER_MEMORY_REGION: {
 		struct kvm_userspace_memory_region kvm_userspace_mem;
-
+		
 		r = -EFAULT;
 		if (copy_from_user(&kvm_userspace_mem, argp,
 						sizeof(kvm_userspace_mem)))
 			goto out;
 
+		// printk("kvm_vm_ioctl: KVM_SET_USER_MEMORY_REGION slot: %d flags %d guest_phys %llx memory_size %llx userspace addr %llx\n", kvm_userspace_mem.slot, kvm_userspace_mem.flags, kvm_userspace_mem.guest_phys_addr, kvm_userspace_mem.memory_size, kvm_userspace_mem.userspace_addr);
 		r = kvm_vm_ioctl_set_memory_region(kvm, &kvm_userspace_mem);
 		break;
 	}
