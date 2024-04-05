@@ -1796,10 +1796,12 @@ out_bitmap:
 EXPORT_SYMBOL_GPL(__kvm_set_memory_region);
 
 extern u64 __iomem *ept_bypass_maps[N_BYPASS_MAPS];
+extern void setup_ept_hyperupcall_shmem_fault(struct vm_area_struct *vma, struct kvm_vcpu *vcpu);
 static void update_bypass_memslots(struct kvm *kvm) {
 	int i;
 	struct kvm_memslots *slots;
 	struct kvm_memory_slot *slot;
+	struct vm_area_struct *vma;
 
 	if (ept_bypass_maps[MEMSLOTS_BASE_GFNS] == NULL || ept_bypass_maps[MEMSLOTS_NPAGES] == NULL || ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR] == NULL)
 		return;
@@ -1818,6 +1820,10 @@ static void update_bypass_memslots(struct kvm *kvm) {
 			// printk("slot->npages=%lx\n", slot->npages);
 			iowrite64(slot->userspace_addr | slot->flags, &ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][huc_map_slot]);
 			// printk("slot->userspace_addr=%lx\n", slot->userspace_addr);
+			mmap_read_lock(current->mm);
+			vma = find_vma(current->mm, slot->userspace_addr);
+			setup_ept_hyperupcall_shmem_fault(vma, kvm->vcpus[0]);
+			mmap_read_unlock(current->mm);
 		}
 	}
 }

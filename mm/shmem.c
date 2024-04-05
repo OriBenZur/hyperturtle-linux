@@ -246,13 +246,14 @@ static const struct file_operations shmem_file_operations;
 static const struct inode_operations shmem_inode_operations;
 static const struct inode_operations shmem_dir_inode_operations;
 static const struct inode_operations shmem_special_inode_operations;
-static const struct vm_operations_struct shmem_vm_ops;
+struct vm_operations_struct shmem_vm_ops;
 static struct file_system_type shmem_fs_type;
 
 bool vma_is_shmem(struct vm_area_struct *vma)
 {
 	return vma->vm_ops == &shmem_vm_ops;
 }
+EXPORT_SYMBOL_GPL(vma_is_shmem);
 
 static LIST_HEAD(shmem_swaplist);
 static DEFINE_MUTEX(shmem_swaplist_mutex);
@@ -685,7 +686,7 @@ static unsigned long shmem_unused_huge_shrink(struct shmem_sb_info *sbinfo,
 	return 0;
 }
 #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
-
+#include <asm/apic.h>
 /*
  * Like add_to_page_cache_locked, but error if expected item has gone.
  */
@@ -751,7 +752,12 @@ unlock:
 		error = xas_error(&xas);
 		goto error;
 	}
-
+	if (mapping->indices_stack != NULL && mapping->indices_stack_top > 0 && mapping->indices_stack[mapping->indices_stack_top - 1] != index && mapping->indices_stack_top - 1 < 1024) {
+		printk("add to indices stack: %lu\n", index);
+		mapping->indices_stack[mapping->indices_stack_top - 1] = index;
+		mapping->indices_stack_top++;
+		// apic_send_IPI_allbutself(SPURIOUS_APIC_VECTOR);
+	}
 	return 0;
 error:
 	page->mapping = NULL;
@@ -3840,7 +3846,7 @@ static const struct super_operations shmem_ops = {
 #endif
 };
 
-static const struct vm_operations_struct shmem_vm_ops = {
+struct vm_operations_struct shmem_vm_ops = {
 	.fault		= shmem_fault,
 	.map_pages	= filemap_map_pages,
 #ifdef CONFIG_NUMA
@@ -3848,6 +3854,7 @@ static const struct vm_operations_struct shmem_vm_ops = {
 	.get_policy     = shmem_get_policy,
 #endif
 };
+EXPORT_SYMBOL_GPL(shmem_vm_ops);
 
 int shmem_init_fs_context(struct fs_context *fc)
 {

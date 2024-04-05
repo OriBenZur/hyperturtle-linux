@@ -473,6 +473,8 @@ struct address_space {
 	spinlock_t		private_lock;
 	struct list_head	private_list;
 	void			*private_data;
+	u64 *indices_stack;
+	unsigned int indices_stack_top;
 } __attribute__((aligned(sizeof(long)))) __randomize_layout;
 	/*
 	 * On most architectures that alignment is already the case; but
@@ -2849,6 +2851,7 @@ extern bool filemap_range_has_page(struct address_space *, loff_t lstart,
 				  loff_t lend);
 extern bool filemap_range_needs_writeback(struct address_space *,
 					  loff_t lstart, loff_t lend);
+extern struct page *filemap_get_next_page(struct address_space *mapping, pgoff_t *index);
 extern int filemap_write_and_wait_range(struct address_space *mapping,
 				        loff_t lstart, loff_t lend);
 extern int __filemap_fdatawrite_range(struct address_space *mapping,
