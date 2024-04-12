@@ -1796,43 +1796,53 @@ out_bitmap:
 EXPORT_SYMBOL_GPL(__kvm_set_memory_region);
 
 extern u64 __iomem *ept_bypass_maps[N_BYPASS_MAPS];
+extern u32 hypervisor_pid;
 extern void setup_ept_hyperupcall_shmem_fault(struct vm_area_struct *vma, struct kvm_vcpu *vcpu);
 static void update_bypass_memslots(struct kvm *kvm) {
 	int i;
 	struct kvm_memslots *slots;
 	struct kvm_memory_slot *slot;
 	struct vm_area_struct *vma;
+	int huc_map_slot = 0;
 
 	if (ept_bypass_maps[MEMSLOTS_BASE_GFNS] == NULL || ept_bypass_maps[MEMSLOTS_NPAGES] == NULL || ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR] == NULL)
 		return;
 
 	// printk("update_bypass_memslots\n");
-	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
+	for (i = 0; i < 1; i++) {
 		slots = __kvm_memslots(kvm, i);
 		// printk("slots->used_slots=%d\n", slots->used_slots);
 		kvm_for_each_memslot(slot, slots) {
-			int huc_map_slot = (slot->id & 0b111111) + (64*i);
 			// printk("slot->id=%d->%d, i*64 = %d*64 = %d\n", slot->id, slot->id & 0b111111, i, i*64);
-			// printk("huc_map_slot=%d\n", huc_map_slot);
+			// printk("huc_map_slot=%d %p %p\n", huc_map_slot, slots, slot);
 			iowrite64(slot->base_gfn, &ept_bypass_maps[MEMSLOTS_BASE_GFNS][huc_map_slot]);
 			// printk("slot->base_gfn=%llx\n", slot->base_gfn);
 			iowrite64(slot->npages, &ept_bypass_maps[MEMSLOTS_NPAGES][huc_map_slot]);
 			// printk("slot->npages=%lx\n", slot->npages);
-			iowrite64(slot->userspace_addr | slot->flags, &ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][huc_map_slot]);
+			iowrite64(slot->userspace_addr, &ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][huc_map_slot]);
 			// printk("slot->userspace_addr=%lx\n", slot->userspace_addr);
 			mmap_read_lock(current->mm);
 			vma = find_vma(current->mm, slot->userspace_addr);
 			setup_ept_hyperupcall_shmem_fault(vma, kvm->vcpus[0]);
 			mmap_read_unlock(current->mm);
+			huc_map_slot++;
 		}
+	}
+	while (ioread64(&ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][huc_map_slot]) != 0) {
+		iowrite64(0, &ept_bypass_maps[MEMSLOTS_BASE_GFNS][huc_map_slot]);
+		iowrite64(0, &ept_bypass_maps[MEMSLOTS_NPAGES][huc_map_slot]);
+		iowrite64(0, &ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][huc_map_slot]);
+		huc_map_slot++;
 	}
 }
 
 void setup_bypass_memslots(struct kvm *kvm) {
 	if (ept_bypass_maps[MEMSLOTS_BASE_GFNS] == NULL || ept_bypass_maps[COUNTERS] == NULL)
 		return;
-	if (ioread64(&ept_bypass_maps[COUNTERS][QEMU_CR3]) == 0)
+	if (ioread64(&ept_bypass_maps[COUNTERS][QEMU_CR3]) == 0) {
+		hypervisor_pid = current->tgid;
 		iowrite64(read_cr3_pa(), &ept_bypass_maps[COUNTERS][QEMU_CR3]);
+	}
 	mutex_lock(&kvm->slots_lock);
 	update_bypass_memslots(kvm);
 	mutex_unlock(&kvm->slots_lock);

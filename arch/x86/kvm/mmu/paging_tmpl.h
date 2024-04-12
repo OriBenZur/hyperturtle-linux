@@ -625,14 +625,16 @@ retry_walk:
 					printk("failed alloc bypass\n");
 					goto error;
 				}
-				goto retry_walk;
+				pte_access = pt_access & (pte ^ walk_nx_mask);
+				ull_pte = pte;
+				goto alloc_bypass_success;
 			}
-			// update EPT12
-			#else
-			//printk("got error is_present_gpte %p\n", (void *)ull_pte);
 			#endif
 			goto error;
 		}
+		#if PTTYPE == PTTYPE_EPT
+		alloc_bypass_success:
+		#endif
 
 		if (unlikely(__is_rsvd_bits_set(&mmu->guest_rsvd_check, pte, walker->level))) {
 			errcode = PFERR_RSVD_MASK | PFERR_PRESENT_MASK;

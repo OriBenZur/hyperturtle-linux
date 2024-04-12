@@ -59,7 +59,8 @@
 #include "../mmu/mmu_internal.h"
 #include "../mmu/tdp_mmu.h"
 #include <asm/pgtable_types.h>
-
+#include <linux/kthread.h>
+#include <linux/delay.h>
 
 #include "capabilities.h"
 #include "cpuid.h"
@@ -6685,11 +6686,13 @@ static int setup_ept_bypass_maps(void) {
 	// 	ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][i] = memslot->userspace_addr;
 	// }
 	// mutex_unlock(&kvm->slots_lock);
+	iowrite64(1, &ept_bypass_maps[COUNTERS][BYPASS_ALLOC_ENABLE]);
 	return i;
 }
 
 static void cleanup_ept_bypass_maps(void) {
-	int i;
+	int i, pages_freed;
+	u64 gpa, pfn;
 	if (ept_bypass_maps[PFN_CACHE] == NULL) return;
 	for (i = 0; i < N_COUNTERS; i++) {
 		if (i == PFN_CACHE_SIZE_KEY)
@@ -6704,6 +6707,19 @@ static void cleanup_ept_bypass_maps(void) {
 		iowrite64(0, &ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][i]);
 		// iowrite64(0, &ept_bypass_maps[MEMSLOTS_FLAGS][i]);
 	}
+
+	pages_freed = 0;
+	for (i = 0; i < pfn_cache_size; i++) {
+		gpa = ioread64(&ept_bypass_maps[PFN_CACHE][i]);
+		pfn = ioread64(&ept_bypass_maps[PFN_CACHE][i + pfn_cache_size]);
+		if (pfn  == 0)
+			continue;
+		pages_freed++;
+		__free_page(pfn_to_page(pfn));
+		iowrite64(0, &ept_bypass_maps[PFN_CACHE][i]);
+		iowrite64(0, &ept_bypass_maps[PFN_CACHE][i + pfn_cache_size]);
+	}
+	printk("freed %d pages\n", pages_freed);
 	
 	for (i = 0; i < N_BYPASS_MAPS; i++) {
 		if (ept_bypass_maps[i] != NULL) {
@@ -6711,17 +6727,28 @@ static void cleanup_ept_bypass_maps(void) {
 			ept_bypass_maps[i] = NULL;
 		}
 	}
+
 	pfn_cache_size = 0;
 }
 
+
+/* Hold bypass_lock */
 noinline static int topup_bypass_allocation_cache(bool fill_all) {
+	 // Acquire the lock
+	// Check if the lock is already locked
+
+	gfp_t gfp = GFP_KERNEL_ACCOUNT | __GFP_ZERO | GFP_USER;
+	kvm_pfn_t pfn;
+	gpa_t gpa;
+	struct page *page;
 	u32 n_allocations = 0, max_n_allocations = 0;
 	max_n_allocations = 1;
+
 	if (unlikely(ept_bypass_maps[PFN_CACHE] == NULL || pfn_cache_size == 0))
 		return 0;
+	
 	// if (pfn_cache_size - pfn_cache_n_free_slots < 32)
 	// max_n_allocations = (64 * (pfn_cache_size - pfn_cache_n_free_slots)) / pfn_cache_size;
-	max_n_allocations = 1;
 	// else if (pfn_cache_n_free_slots < 64)
 	// 	max_n_allocations = 16;
 	// else if (pfn_cache_n_free_slots < 32)
@@ -6729,10 +6756,6 @@ noinline static int topup_bypass_allocation_cache(bool fill_all) {
 	// else
 	// 	max_n_allocations = 8;
 	while (n_allocations < max_n_allocations || fill_all) {
-		gfp_t gfp = GFP_KERNEL_ACCOUNT | __GFP_ZERO | GFP_USER;
-		kvm_pfn_t pfn;
-		gpa_t gpa;
-		struct page *page;
 		gpa = (gpa_t)ioread64(&ept_bypass_maps[PFN_CACHE][ept_bypass_index]);
 		pfn = (kvm_pfn_t)ioread64(&ept_bypass_maps[PFN_CACHE][ept_bypass_index + pfn_cache_size]);
 		if (pfn != (kvm_pfn_t)gpa || gpa != 0) {
@@ -6754,6 +6777,7 @@ noinline static int topup_bypass_allocation_cache(bool fill_all) {
 		n_allocations++;
 	}
 	// if (n_allocations > 1) printk("n_allocations: %u", n_allocations);
+
 	return n_allocations;
 }
 
@@ -6772,8 +6796,8 @@ static fastpath_t vmx_vcpu_run(struct kvm_vcpu *vcpu)
 	// 	setup_hyperupcall_memslots = true;
 	// }
 	
-	if (vcpu->vcpu_id == 0)
-		topup_bypass_allocation_cache(false);
+	// if (ept_hyperupcall_on && vcpu->vcpu_id == 0)
+		// topup_bypass_allocation_cache(false);
 
 
 	/* Record the guest's net vcpu time for enforced NMI injections. */
@@ -8090,14 +8114,33 @@ static void vmx_cleanup_l1d_flush(void)
 	l1tf_vmx_mitigation = VMENTER_L1D_FLUSH_AUTO;
 }
 
+// static spinlock_t bypass_lock;
+static struct task_struct *bypass_alloc_task_struct;
+static int bypass_alloc_kthread(void *arg) {
+	// spin_lock(&bypass_lock);
+	int r;
+	while(!kthread_should_stop()) {
+		r = topup_bypass_allocation_cache(true);
+		// if (r > 0)
+			// printk("topup_bypass_allocation_cache success %d\n", r);
+		// spin_unlock(&bypass_lock);
+		msleep(100);
+		// spin_lock(&bypass_lock);
+	}
+	return 0;
+}
+
 static void vmx_exit(void)
 {
 #ifdef CONFIG_KEXEC_CORE
 	RCU_INIT_POINTER(crash_vmclear_loaded_vmcss, NULL);
 	synchronize_rcu();
 #endif
+	if (bypass_alloc_task_struct != NULL) {
+		kthread_stop(bypass_alloc_task_struct);
+		bypass_alloc_task_struct = NULL;
+	}
 	cleanup_ept_bypass_maps();
-
 	kvm_exit();
 
 #if IS_ENABLED(CONFIG_HYPERV)
@@ -8128,6 +8171,7 @@ static void vmx_exit(void)
 	allow_smaller_maxphyaddr = false;
 }
 module_exit(vmx_exit);
+
 
 static int __init vmx_init(void)
 {
@@ -8210,6 +8254,7 @@ static int __init vmx_init(void)
 		if (setup_ept_bypass_maps()) {
 			ept_hyperupcall_on = true;
 			topup_bypass_allocation_cache(true);
+			bypass_alloc_task_struct = kthread_run(bypass_alloc_kthread, NULL, "hyperupcall_bypass_kthread");
 			printk("setup_ept_bypass_maps success %p\n", ept_bypass_maps[PFN_CACHE]);
 		}
 	}
