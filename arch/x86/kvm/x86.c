@@ -10151,6 +10151,8 @@ static noinline void sync_remap_list(struct kvm *kvm) {
 }
 
 static DECLARE_WAIT_QUEUE_HEAD(bypass_alloc_wq);
+static struct wait_queue_head direct_exe_wq[KVM_MAX_VCPUS];
+static volatile u64 hyperupcall_direct_exe_up_vector = 0;
 struct task_struct *bypass_alloc_task_struct;
 EXPORT_SYMBOL_GPL(bypass_alloc_task_struct);
 
@@ -10366,6 +10368,13 @@ int bypass_alloc_kthread(void *arg) {
 }
 EXPORT_SYMBOL_GPL(bypass_alloc_kthread);
 
+
+__attribute__((optimize("O0")))
+noinline u64 sched_direct_exe(u64 vcpu_id) {
+	return 0;
+}
+ALLOW_ERROR_INJECTION(sched_direct_exe, ERRNO);
+
 /*
  * Returns 1 to let vcpu_run() continue the guest execution loop without
  * exiting to the userspace.  Otherwise, the value will be returned to the
@@ -10381,6 +10390,21 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	static bool did_map_bypass_to_userspace = false;
 
 	bool req_immediate_exit = false;
+	u64 direct_exe_r;
+	// u32 i = 0;
+	// if (hyperupcall_direct_exe_up_vector)
+	// spin_lock(&direct_exe_wq[0].lock);
+	direct_exe_r = sched_direct_exe(vcpu->vcpu_id);
+	// printk("prelock direct_exe_r: %llx\n", direct_exe_r);
+	// printk("prelock hyperupcall_direct_exe_up_vector: %llx\n", hyperupcall_direct_exe_up_vector);
+	if (direct_exe_r) {
+		// printk("vcpu %d sleeping for %llx jifs, direct_ese: %llx\n", vcpu->vcpu_id, direct_exe_r, (direct_exe_r)/ (NSEC_PER_SEC / HZ));
+		wake_up_interruptible(&direct_exe_wq[vcpu->vcpu_id == 2 ? 3 : 2]);
+		wait_event_interruptible_timeout(direct_exe_wq[vcpu->vcpu_id], sched_direct_exe(vcpu->vcpu_id) == 0, direct_exe_r / (NSEC_PER_SEC / HZ));
+		// printk("vcpu %d woke up\n", vcpu->vcpu_id);
+		// schedule_timeout_interruptible(5);
+	}
+	// spin_unlock(&direct_exe_wq[0].lock);
 
 	/* Forbid vmenter if vcpu dirty ring is soft-full */
 	if (unlikely(vcpu->kvm->dirty_ring_size &&
@@ -10776,10 +10800,13 @@ static inline bool kvm_vcpu_running(struct kvm_vcpu *vcpu)
 		!vcpu->arch.apf.halted);
 }
 
+
 static int vcpu_run(struct kvm_vcpu *vcpu)
 {
 	int r;
 	struct kvm *kvm = vcpu->kvm;
+
+
 
 	vcpu->srcu_idx = srcu_read_lock(&kvm->srcu);
 	vcpu->arch.l1tf_flush_l1d = true;
@@ -12093,6 +12120,12 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 {
 	int ret;
 	unsigned long flags;
+	int i;
+
+	for (i = 0; i < KVM_MAX_VCPUS; i++) {
+		direct_exe_wq[i] = (struct wait_queue_head){.lock = __SPIN_LOCK_UNLOCKED(direct_exe_wq[i].lock), .head = LIST_HEAD_INIT(direct_exe_wq[i].head)};
+	}
+	
 
 	if (type)
 		return -EINVAL;
