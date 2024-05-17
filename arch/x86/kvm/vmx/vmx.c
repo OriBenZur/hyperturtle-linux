@@ -8071,9 +8071,28 @@ static void vmx_cleanup_l1d_flush(void)
 
 // static spinlock_t bypass_lock;
 extern struct task_struct *bypass_alloc_task_struct;
+extern volatile void __user *(*hyperupcall_pa_to_va)(unsigned long, int);
 
-// Rest of the code...
 extern int bypass_alloc_kthread(void *arg);
+
+static volatile void __user *vmx_hyperupcall_pa_to_va(unsigned long gpa, int size) {
+	unsigned long hva, gfn;
+	struct kvm_vcpu *vcpu;
+	if ((gpa + size - 1) >> PAGE_SHIFT != gpa >> PAGE_SHIFT) {
+		printk("vmx_hyperupcall_pa_to_va: gpa %lx is not page aligned with size %d \n", gpa, size);
+		return NULL;
+	}
+	vcpu = kvm_get_running_vcpu();
+	if (vcpu == NULL) {
+		printk("vmx_hyperupcall_pa_to_va: vcpu is NULL\n");
+		return NULL;
+	}
+	gfn = gpa >> PAGE_SHIFT;
+	hva = (kvm_vcpu_gfn_to_hva(vcpu, gfn) & PAGE_MASK) + (gpa & ~PAGE_MASK);
+	// printk("vmx_hyperupcall_pa_to_va: hva %lx\n", hva);
+	return (void __user *)hva;
+
+}
 
 static void vmx_exit(void)
 {
@@ -8085,6 +8104,7 @@ static void vmx_exit(void)
 		kthread_stop(bypass_alloc_task_struct);
 		bypass_alloc_task_struct = NULL;
 	}
+	hyperupcall_pa_to_va = NULL;
 	cleanup_ept_bypass_maps();
 	kvm_exit();
 
@@ -8206,6 +8226,7 @@ static int __init vmx_init(void)
 			printk("setup_ept_bypass_maps success %p\n", ept_bypass_maps[PFN_CACHE]);
 		}
 	}
+	hyperupcall_pa_to_va = &vmx_hyperupcall_pa_to_va;
 
 	return 0;
 }

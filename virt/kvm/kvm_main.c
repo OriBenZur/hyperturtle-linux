@@ -3217,6 +3217,13 @@ update_halt_poll_stats(struct kvm_vcpu *vcpu, u64 poll_ns, bool waited)
 		vcpu->stat.generic.halt_poll_success_ns += poll_ns;
 }
 
+__attribute__((optimize("O0")))
+noinline u64 mark_vcpu_blocking(struct kvm_vcpu *vcpu)
+{
+	return 0;
+}
+ALLOW_ERROR_INJECTION(mark_vcpu_blocking, ERRNO);
+
 /*
  * The vCPU has executed a HLT instruction with in-kernel mode enabled.
  */
@@ -3262,7 +3269,7 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
 	prepare_to_rcuwait(&vcpu->wait);
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
-
+		mark_vcpu_blocking(vcpu);
 		if (kvm_vcpu_check_block(vcpu) < 0)
 			break;
 

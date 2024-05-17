@@ -7,6 +7,7 @@
 #define _TRACE_BPF_TRACE_H
 
 #include <linux/tracepoint.h>
+volatile void __user *(*hyperupcall_pa_to_va)(unsigned long, int);
 
 TRACE_EVENT(bpf_trace_printk,
 

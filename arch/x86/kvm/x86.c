@@ -10151,6 +10151,7 @@ static noinline void sync_remap_list(struct kvm *kvm) {
 }
 
 static DECLARE_WAIT_QUEUE_HEAD(bypass_alloc_wq);
+bool bypass_allocations_ready = true;
 static struct wait_queue_head direct_exe_wq[KVM_MAX_VCPUS];
 static volatile u64 hyperupcall_direct_exe_up_vector = 0;
 struct task_struct *bypass_alloc_task_struct;
@@ -10169,7 +10170,6 @@ bool noinline map_bypass_allocations_to_user_space(struct kvm_vcpu *vcpu) {
 	r = 0;
 	if (unlikely(ept_bypass_maps[COUNTERS] == NULL || vcpu->vcpu_id != 0 || pfn_cache_size == 0 || current->mm == NULL || ioread64(&ept_bypass_maps[COUNTERS][BYPASS_ALLOC_ENABLE]) == 0))
 		return false;
-	// printk("mapping bypass allocations to user space\n");
 	sync_no_map_list(vcpu->kvm);
 	sync_remap_list(vcpu->kvm);
 	gpa = ioread64(&ept_bypass_maps[PFN_CACHE][2*ept_user_map_index]);
@@ -10221,17 +10221,20 @@ bool noinline map_bypass_allocations_to_user_space(struct kvm_vcpu *vcpu) {
 		ptep = get_locked_pte(current->mm, hva, &ptl);
 		// if (!pte_present(*ptep) || pte_pfn(*ptep) != ((ept_spte & PT64_BASE_ADDR_MASK) >> PAGE_SHIFT)) {
 
-		if (pte_pfn(*ptep) != pfn) {
-			pr_err("gpa: %llx pte not clear: %lx memslot->flags: %d memslotbase: %llx memslotnpages: %lx\n", gpa, ptep->pte, slot->flags, slot->base_gfn, slot->npages);
+		// if (pte_pfn(*ptep) != pfn) {
+		// 	pr_err("gpa: %llx pte not clear: %lx memslot->flags: %d memslotbase: %llx memslotnpages: %lx\n", gpa, ptep->pte, slot->flags, slot->base_gfn, slot->npages);
+		// }
+		if (ptep != NULL) {
+			pte_clear(current->mm, hva, ptep);
+			pte_unmap_unlock(ptep, ptl);
 		}
-		pte_clear(current->mm, hva, ptep);
-		pte_unmap_unlock(ptep, ptl);
 
-		if ((vma->vm_flags & VM_MAYSHARE) && vma_is_shmem(vma)) {
+		if (vma_is_shmem(vma)) {
 			// printk("shmem fault gpa: %llx hva: %lx pfn %llx\n", gpa, hva, pfn);
 			handle_memory_backed_file_aux(vcpu, gpa, hva, pfn, gpa >> 12, vma, slot);
 		}
 		else {
+			page_ref_inc(pfn_to_page(pfn));
 			if (unlikely(!(vma->vm_flags & VM_MIXEDMAP))) {
 				printk("vma->vm_flags: %lx vma->start_addr: %lx vma->end_addr: %lx vma->file: %p \n", vma->vm_flags, vma->vm_start, vma->vm_end, vma->vm_file);
 				mmap_read_unlock(current->mm);
@@ -10267,6 +10270,7 @@ bool noinline map_bypass_allocations_to_user_space(struct kvm_vcpu *vcpu) {
 	flush_faultin_stack(vcpu);
 	pfn_cache_n_free_slots += n_mappings;
 	if (pfn_cache_n_free_slots > 2048 && bypass_alloc_task_struct != NULL) {
+		bypass_allocations_ready = true;
 		wake_up(&bypass_alloc_wq);
 		pfn_cache_n_free_slots = 0;
 	}
@@ -10357,8 +10361,11 @@ int bypass_alloc_kthread(void *arg) {
 	while(!kthread_should_stop()) {
 		// ept_hyperupcall_sync_page_cache();
 		r = topup_bypass_allocation_cache(-1, true);
-		if (r == 0)
-			wait_event_interruptible(bypass_alloc_wq, true);
+		if (r == 0) {
+			// schedule();
+			bypass_allocations_ready = false;
+			wait_event_interruptible(bypass_alloc_wq, bypass_allocations_ready || kthread_should_stop());
+		}
 		// 	printk("topup_bypass_allocation_cache success %d\n", r);
 		// spin_unlock(&bypass_lock);
 		// msleep(10);
@@ -10375,6 +10382,12 @@ noinline u64 sched_direct_exe(u64 vcpu_id) {
 }
 ALLOW_ERROR_INJECTION(sched_direct_exe, ERRNO);
 
+__attribute__((optimize("O0")))
+noinline u64 direct_exe_should_wake_up(u64 vcpu_id) {
+	return 1;
+}
+ALLOW_ERROR_INJECTION(direct_exe_should_wake_up, ERRNO);
+
 /*
  * Returns 1 to let vcpu_run() continue the guest execution loop without
  * exiting to the userspace.  Otherwise, the value will be returned to the
@@ -10390,20 +10403,34 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	static bool did_map_bypass_to_userspace = false;
 
 	bool req_immediate_exit = false;
-	u64 direct_exe_r;
+	// u64 direct_exe_r;
+	// u32 vcpu_to_wake = 0;
+	// u32 sleep_time = 0;
 	// u32 i = 0;
 	// if (hyperupcall_direct_exe_up_vector)
 	// spin_lock(&direct_exe_wq[0].lock);
-	direct_exe_r = sched_direct_exe(vcpu->vcpu_id);
+	// direct_exe_r = sched_direct_exe(vcpu->vcpu_id);
 	// printk("prelock direct_exe_r: %llx\n", direct_exe_r);
 	// printk("prelock hyperupcall_direct_exe_up_vector: %llx\n", hyperupcall_direct_exe_up_vector);
-	if (direct_exe_r) {
-		// printk("vcpu %d sleeping for %llx jifs, direct_ese: %llx\n", vcpu->vcpu_id, direct_exe_r, (direct_exe_r)/ (NSEC_PER_SEC / HZ));
-		wake_up_interruptible(&direct_exe_wq[vcpu->vcpu_id == 2 ? 3 : 2]);
-		wait_event_interruptible_timeout(direct_exe_wq[vcpu->vcpu_id], sched_direct_exe(vcpu->vcpu_id) == 0, direct_exe_r / (NSEC_PER_SEC / HZ));
-		// printk("vcpu %d woke up\n", vcpu->vcpu_id);
-		// schedule_timeout_interruptible(5);
-	}
+	// if (direct_exe_r) {
+	// 	sleep_time = (u32)(direct_exe_r >> 32);
+	// 	vcpu_to_wake = (u32)direct_exe_r;
+	// 	printk("vcpu %d sleeping for %llx jifs, direct_ese: %llx\n", vcpu->vcpu_id, direct_exe_r, (direct_exe_r)/ (NSEC_PER_SEC / HZ));
+	// 	for (i  = 0; i < 32; i++) {
+	// 		if ((vcpu_to_wake & (1 << i)) == 0 || i == vcpu->vcpu_id) {
+	// 			continue;
+	// 		}
+	// 		wake_up_interruptible(&direct_exe_wq[i]);
+	// 		printk("waking up vcpu %d\n", i);
+	// 	}
+	// 	// wake_up_interruptible(&direct_exe_wq[vcpu->vcpu_id == 2 ? 3 : 2]);
+	// 	if ((vcpu_to_wake & (1 << vcpu->vcpu_id)) == 0) {
+	// 		printk("vcpu %d going to sleep for %d jifs\n", vcpu->vcpu_id, sleep_time);
+	// 		wait_event_interruptible_timeout(direct_exe_wq[vcpu->vcpu_id], direct_exe_should_wake_up(vcpu->vcpu_id), sleep_time);
+	// 	}
+	// 	printk("vcpu %d woke up\n", vcpu->vcpu_id);
+	// 	// schedule_timeout_interruptible(5);
+	// }
 	// spin_unlock(&direct_exe_wq[0].lock);
 
 	/* Forbid vmenter if vcpu dirty ring is soft-full */
