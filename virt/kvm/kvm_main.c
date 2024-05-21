@@ -3218,11 +3218,12 @@ update_halt_poll_stats(struct kvm_vcpu *vcpu, u64 poll_ns, bool waited)
 }
 
 __attribute__((optimize("O0")))
-noinline u64 mark_vcpu_blocking(struct kvm_vcpu *vcpu)
+noinline u64 mark_vcpu_blocking(int vcpu_id)
 {
 	return 0;
 }
 ALLOW_ERROR_INJECTION(mark_vcpu_blocking, ERRNO);
+extern struct wait_queue_head direct_exe_wq[KVM_MAX_VCPUS];
 
 /*
  * The vCPU has executed a HLT instruction with in-kernel mode enabled.
@@ -3232,6 +3233,7 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
 	ktime_t start, cur, poll_end;
 	bool waited = false;
 	u64 block_ns;
+	int r = 0, i = 0;
 
 	kvm_arch_vcpu_blocking(vcpu);
 
@@ -3269,7 +3271,15 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
 	prepare_to_rcuwait(&vcpu->wait);
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		mark_vcpu_blocking(vcpu);
+		r = mark_vcpu_blocking(vcpu->vcpu_id); // Is r always 0?
+		for (i  = 0; i < 32; i++) {
+			// if r is always 0, this wakes up all but CPU 0,1
+			if ((r & (1 << i)) == 0 || i == vcpu->vcpu_id) {
+				continue;
+			}
+			wake_up_interruptible(&direct_exe_wq[i]);
+			printk("waking up vcpu %d\n", i);
+		}
 		if (kvm_vcpu_check_block(vcpu) < 0)
 			break;
 

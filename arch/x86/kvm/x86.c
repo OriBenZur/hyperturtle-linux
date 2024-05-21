@@ -8951,7 +8951,7 @@ int kvm_emulate_hypercall(struct kvm_vcpu *vcpu)
 		vcpu->run->hypercall.nr       = nr;
 		vcpu->run->hypercall.args[0]  = binary;
 		vcpu->run->hypercall.args[1]  = program_len;
-		// printk("Hello hypercall! %lu %llu %llu %llu\n", nr, binary, major_id, minor_id);
+		printk("Hello hypercall! %lu %llu %llu %llu\n", nr, binary, major_id, minor_id);
 
 		vcpu->arch.complete_userspace_io = complete_hypercall_exit;
 		return 0;
@@ -10152,7 +10152,8 @@ static noinline void sync_remap_list(struct kvm *kvm) {
 
 static DECLARE_WAIT_QUEUE_HEAD(bypass_alloc_wq);
 bool bypass_allocations_ready = true;
-static struct wait_queue_head direct_exe_wq[KVM_MAX_VCPUS];
+struct wait_queue_head direct_exe_wq[KVM_MAX_VCPUS];
+EXPORT_SYMBOL_GPL(direct_exe_wq);
 static volatile u64 hyperupcall_direct_exe_up_vector = 0;
 struct task_struct *bypass_alloc_task_struct;
 EXPORT_SYMBOL_GPL(bypass_alloc_task_struct);
@@ -10403,34 +10404,34 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	static bool did_map_bypass_to_userspace = false;
 
 	bool req_immediate_exit = false;
-	// u64 direct_exe_r;
-	// u32 vcpu_to_wake = 0;
-	// u32 sleep_time = 0;
-	// u32 i = 0;
+	u64 direct_exe_r;
+	u32 vcpu_to_wake = 0;
+	u32 sleep_time = 0;
+	u32 i = 0;
 	// if (hyperupcall_direct_exe_up_vector)
 	// spin_lock(&direct_exe_wq[0].lock);
-	// direct_exe_r = sched_direct_exe(vcpu->vcpu_id);
+	direct_exe_r = sched_direct_exe(vcpu->vcpu_id);
 	// printk("prelock direct_exe_r: %llx\n", direct_exe_r);
 	// printk("prelock hyperupcall_direct_exe_up_vector: %llx\n", hyperupcall_direct_exe_up_vector);
-	// if (direct_exe_r) {
-	// 	sleep_time = (u32)(direct_exe_r >> 32);
-	// 	vcpu_to_wake = (u32)direct_exe_r;
-	// 	printk("vcpu %d sleeping for %llx jifs, direct_ese: %llx\n", vcpu->vcpu_id, direct_exe_r, (direct_exe_r)/ (NSEC_PER_SEC / HZ));
-	// 	for (i  = 0; i < 32; i++) {
-	// 		if ((vcpu_to_wake & (1 << i)) == 0 || i == vcpu->vcpu_id) {
-	// 			continue;
-	// 		}
-	// 		wake_up_interruptible(&direct_exe_wq[i]);
-	// 		printk("waking up vcpu %d\n", i);
-	// 	}
-	// 	// wake_up_interruptible(&direct_exe_wq[vcpu->vcpu_id == 2 ? 3 : 2]);
-	// 	if ((vcpu_to_wake & (1 << vcpu->vcpu_id)) == 0) {
-	// 		printk("vcpu %d going to sleep for %d jifs\n", vcpu->vcpu_id, sleep_time);
-	// 		wait_event_interruptible_timeout(direct_exe_wq[vcpu->vcpu_id], direct_exe_should_wake_up(vcpu->vcpu_id), sleep_time);
-	// 	}
-	// 	printk("vcpu %d woke up\n", vcpu->vcpu_id);
-	// 	// schedule_timeout_interruptible(5);
-	// }
+	if (direct_exe_r) {
+		sleep_time = (u32)(direct_exe_r >> 32);
+		vcpu_to_wake = (u32)direct_exe_r;
+		// printk("vcpu %d sleeping for %llx jifs, direct_ese: %llx\n", vcpu->vcpu_id, direct_exe_r, (direct_exe_r)/ (NSEC_PER_SEC / HZ));
+		for (i  = 0; i < 32; i++) {
+			if ((vcpu_to_wake & (1 << i)) == 0 || i == vcpu->vcpu_id) {
+				continue;
+			}
+			wake_up_interruptible(&direct_exe_wq[i]);
+			// printk("waking up vcpu %d\n", i);
+		}
+		// wake_up_interruptible(&direct_exe_wq[vcpu->vcpu_id == 2 ? 3 : 2]);
+		if ((vcpu_to_wake & (1 << vcpu->vcpu_id)) == 0) {
+			// printk("vcpu %d going to sleep for %d jifs\n", vcpu->vcpu_id, sleep_time);
+			wait_event_interruptible_timeout(direct_exe_wq[vcpu->vcpu_id], direct_exe_should_wake_up(vcpu->vcpu_id), sleep_time);
+			// printk("vcpu %d woke up\n", vcpu->vcpu_id);
+		}
+		// schedule_timeout_interruptible(5);
+	}
 	// spin_unlock(&direct_exe_wq[0].lock);
 
 	/* Forbid vmenter if vcpu dirty ring is soft-full */
