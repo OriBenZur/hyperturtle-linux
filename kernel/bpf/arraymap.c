@@ -135,8 +135,10 @@ static struct bpf_map *array_map_alloc(union bpf_attr *attr)
 			return ERR_PTR(-ENOMEM);
 		array = data + PAGE_ALIGN(sizeof(struct bpf_array))
 			- offsetof(struct bpf_array, value);
+			printk("Allocated mmapable bpf array \"data\": %p, \"array\": %p", data, array);
 	} else {
 		array = bpf_map_area_alloc(array_size, numa_node);
+		printk("Allocated mmapable bpf array \"array\": %p", array);
 	}
 	if (!array)
 		return ERR_PTR(-ENOMEM);

@@ -1721,6 +1721,7 @@ pte_t *__get_locked_pte(struct mm_struct *mm, unsigned long addr,
 		return NULL;
 	return pte_alloc_map_lock(mm, pmd, addr, ptl);
 }
+EXPORT_SYMBOL(__get_locked_pte);
 
 static int validate_page_before_insert(struct page *page)
 {
@@ -2366,8 +2367,10 @@ int remap_pfn_range_notrack(struct vm_area_struct *vma, unsigned long addr,
 	struct mm_struct *mm = vma->vm_mm;
 	int err;
 
-	if (WARN_ON_ONCE(!PAGE_ALIGNED(addr)))
+	if (WARN_ON_ONCE(!PAGE_ALIGNED(addr))) {
+		printk("remap_pfn_range_notrack: addr not aligned: addr = %lx\n", addr);
 		return -EINVAL;
+	}
 
 	/*
 	 * Physically remapped pages are special. Tell the
@@ -2388,8 +2391,10 @@ int remap_pfn_range_notrack(struct vm_area_struct *vma, unsigned long addr,
 	 * See vm_normal_page() for details.
 	 */
 	if (is_cow_mapping(vma->vm_flags)) {
-		if (addr != vma->vm_start || end != vma->vm_end)
+		if (addr != vma->vm_start || end != vma->vm_end) {
+			printk("remap_pfn_range_notrack: addr start and end not equal: addr = %lx", addr);
 			return -EINVAL;
+		}
 		vma->vm_pgoff = pfn;
 	}
 
@@ -2403,8 +2408,10 @@ int remap_pfn_range_notrack(struct vm_area_struct *vma, unsigned long addr,
 		next = pgd_addr_end(addr, end);
 		err = remap_p4d_range(mm, pgd, addr, next,
 				pfn + (addr >> PAGE_SHIFT), prot);
-		if (err)
+		if (err) {
+			printk("mapping pfn failed: err = %d, addr = %lx, pfn = %lx\n", err, addr, pfn);
 			return err;
+		}
 	} while (pgd++, addr = next, addr != end);
 
 	return 0;
@@ -2428,12 +2435,15 @@ int remap_pfn_range(struct vm_area_struct *vma, unsigned long addr,
 	int err;
 
 	err = track_pfn_remap(vma, &prot, pfn, addr, PAGE_ALIGN(size));
-	if (err)
+	if (err) {
+		// printk("remap_pfn_range: track_pfn_remap failed: err = %d, addr = %lx, pfn = %lx\n", err, addr, pfn);
 		return -EINVAL;
+	}
 
 	err = remap_pfn_range_notrack(vma, addr, pfn, size, prot);
-	if (err)
+	if (err) {
 		untrack_pfn(vma, pfn, PAGE_ALIGN(size));
+	}
 	return err;
 }
 EXPORT_SYMBOL(remap_pfn_range);
@@ -3364,6 +3374,7 @@ void unmap_mapping_page(struct page *page)
 					 last_index, &details);
 	i_mmap_unlock_write(mapping);
 }
+EXPORT_SYMBOL_GPL(unmap_mapping_page);
 
 /**
  * unmap_mapping_pages() - Unmap pages from processes.

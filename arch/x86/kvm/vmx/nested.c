@@ -344,7 +344,7 @@ static void nested_ept_invalidate_addr(struct kvm_vcpu *vcpu, gpa_t eptp,
 {
 	uint i;
 	struct kvm_mmu_root_info *cached_root;
-
+	
 	WARN_ON_ONCE(!mmu_is_nested(vcpu));
 
 	for (i = 0; i < KVM_MMU_NUM_PREV_ROOTS; i++) {
@@ -355,6 +355,7 @@ static void nested_ept_invalidate_addr(struct kvm_vcpu *vcpu, gpa_t eptp,
 			vcpu->arch.mmu->invlpg(vcpu, addr, cached_root->hpa);
 	}
 }
+
 
 static void nested_ept_inject_page_fault(struct kvm_vcpu *vcpu,
 		struct x86_exception *fault)

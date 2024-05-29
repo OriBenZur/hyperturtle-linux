@@ -10,6 +10,7 @@
 
 void kvm_spurious_fault(void);
 
+
 static __always_inline void kvm_guest_enter_irqoff(void)
 {
 	/*
@@ -70,6 +71,9 @@ static __always_inline void kvm_guest_exit_irqoff(void)
 #define KVM_VMX_DEFAULT_PLE_WINDOW_MAX	UINT_MAX
 #define KVM_SVM_DEFAULT_PLE_WINDOW_MAX	USHRT_MAX
 #define KVM_SVM_DEFAULT_PLE_WINDOW	3000
+
+bool map_bypass_allocations_to_user_space(struct kvm_vcpu *vcpu);
+
 
 static inline unsigned int __grow_ple_window(unsigned int val,
 		unsigned int base, unsigned int modifier, unsigned int max)
@@ -492,5 +496,7 @@ int kvm_sev_es_mmio_read(struct kvm_vcpu *vcpu, gpa_t src, unsigned int bytes,
 int kvm_sev_es_string_io(struct kvm_vcpu *vcpu, unsigned int size,
 			 unsigned int port, void *data,  unsigned int count,
 			 int in);
+
+int map_bpf_array_to_guest(struct kvm_vcpu *vcpu, char *bpf_obj_name, int map_id, long addr, size_t size);
 
 #endif

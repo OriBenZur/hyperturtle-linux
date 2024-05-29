@@ -3288,6 +3288,38 @@ static inline struct page *next_map_page(struct address_space *mapping,
 				  mapping, xas, end_pgoff);
 }
 
+struct page *filemap_get_next_page(struct address_space *mapping, pgoff_t *index) {
+	struct page *page;
+	unsigned long max_idx;
+	pgoff_t local_index = index ? *index : 0;
+	XA_STATE(xas, &mapping->i_pages, local_index);
+	if (index == NULL) {
+		pr_err("get_next_page: index is NULL\n");
+		return NULL;
+	}
+	page = xas_next_entry(&xas, ULONG_MAX);
+	if (!page)
+		return NULL;
+	if (xa_is_value(page))
+		goto out;
+	if (!trylock_page(page))
+		goto out;
+	if (page->mapping != mapping)
+		goto unlock;
+	if (!PageUptodate(page))
+		goto unlock;
+	max_idx = DIV_ROUND_UP(i_size_read(mapping->host), PAGE_SIZE);
+	if (xas.xa_index >= max_idx)
+		goto unlock;
+	*index = xas.xa_index;
+	return page;
+unlock:
+	unlock_page(page);
+out:
+	return NULL;
+}
+EXPORT_SYMBOL_GPL(filemap_get_next_page);
+
 vm_fault_t filemap_map_pages(struct vm_fault *vmf,
 			     pgoff_t start_pgoff, pgoff_t end_pgoff)
 {

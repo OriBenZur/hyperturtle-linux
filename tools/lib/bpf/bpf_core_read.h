@@ -208,6 +208,10 @@ enum bpf_enum_value_kind {
 /* NOTE: see comments for BPF_CORE_READ_USER() about the proper types use. */
 #define bpf_core_read_user(dst, sz, src)				    \
 	bpf_probe_read_user(dst, sz, (const void *)__builtin_preserve_access_index(src))
+#define bpf_core_read_hyperupcall(dst, sz, src)				    \
+	bpf_probe_read_hyperupcall(dst, sz, (const void *)__builtin_preserve_access_index(src))
+// #define bpf_core_write_hyperupcall(dst, sz, src)				    \
+// 	bpf_probe_write_hyperupcall(dst, sz, (const void *)__builtin_preserve_access_index(src))
 /*
  * bpf_core_read_str() is a thin wrapper around bpf_probe_read_str()
  * additionally emitting BPF CO-RE field relocation for specified source
@@ -338,6 +342,15 @@ enum bpf_enum_value_kind {
 		     dst, (src), a, ##__VA_ARGS__)			    \
 })
 
+#define BPF_PROBE_READ_HYPERUPCALL_INTO(dst, src, a, ...) ({			    \
+	___core_read(bpf_probe_read_HYPERUPCALL, bpf_probe_read_hyperupcall,		    \
+		     dst, (src), a, ##__VA_ARGS__)			    \
+})
+// #define BPF_PROBE_WRITE_HYPERUPCALL_INTO(dst, src, a, ...) ({			    \
+// 	___core_read(bpf_probe_write_hyperupcall, bpf_probe_write_hyperupcall,		    \
+// 		     dst, (src), a, ##__VA_ARGS__)			    \
+// })
+
 /*
  * BPF_CORE_READ_STR_INTO() does same "pointer chasing" as
  * BPF_CORE_READ() for intermediate pointers, but then executes (and returns
@@ -439,6 +452,18 @@ enum bpf_enum_value_kind {
 	BPF_PROBE_READ_USER_INTO(&__r, (src), a, ##__VA_ARGS__);	    \
 	__r;								    \
 })
+
+#define BPF_PROBE_READ_HYPERUPCALL(src, a, ...) ({				    \
+	___type((src), a, ##__VA_ARGS__) __r;				    \
+	BPF_PROBE_READ_HYPERUPCALL_INTO(&__r, (src), a, ##__VA_ARGS__);	    \
+	__r;								    \
+})
+// #define BPF_PROBE_WRITE_HYPERUPCALL(src, a, ...) ({				    \
+// 	___type((src), a, ##__VA_ARGS__) __r;				    \
+// 	BPF_PROBE_WRITE_HYPERUPCALL_INTO(&__r, (src), a, ##__VA_ARGS__);	    \
+// 	__r;								    \
+// })
+
 
 #endif
 

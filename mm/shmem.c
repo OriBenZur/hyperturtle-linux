@@ -246,13 +246,14 @@ static const struct file_operations shmem_file_operations;
 static const struct inode_operations shmem_inode_operations;
 static const struct inode_operations shmem_dir_inode_operations;
 static const struct inode_operations shmem_special_inode_operations;
-static const struct vm_operations_struct shmem_vm_ops;
+struct vm_operations_struct shmem_vm_ops;
 static struct file_system_type shmem_fs_type;
 
 bool vma_is_shmem(struct vm_area_struct *vma)
 {
 	return vma->vm_ops == &shmem_vm_ops;
 }
+EXPORT_SYMBOL_GPL(vma_is_shmem);
 
 static LIST_HEAD(shmem_swaplist);
 static DEFINE_MUTEX(shmem_swaplist_mutex);
@@ -407,7 +408,7 @@ void shmem_uncharge(struct inode *inode, long pages)
 /*
  * Replace item expected in xarray by a new item, while holding xa_lock.
  */
-static int shmem_replace_entry(struct address_space *mapping,
+int shmem_replace_entry(struct address_space *mapping,
 			pgoff_t index, void *expected, void *replacement)
 {
 	XA_STATE(xas, &mapping->i_pages, index);
@@ -421,6 +422,7 @@ static int shmem_replace_entry(struct address_space *mapping,
 	xas_store(&xas, replacement);
 	return 0;
 }
+EXPORT_SYMBOL_GPL(shmem_replace_entry);
 
 /*
  * Sometimes, before we decide whether to proceed or to fail, we must check
@@ -684,7 +686,7 @@ static unsigned long shmem_unused_huge_shrink(struct shmem_sb_info *sbinfo,
 	return 0;
 }
 #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
-
+#include <asm/apic.h>
 /*
  * Like add_to_page_cache_locked, but error if expected item has gone.
  */
@@ -750,7 +752,12 @@ unlock:
 		error = xas_error(&xas);
 		goto error;
 	}
-
+	if (mapping->indices_stack != NULL && mapping->indices_stack_top > 0 && mapping->indices_stack[mapping->indices_stack_top - 1] != index && mapping->indices_stack_top - 1 < 1024) {
+		printk("add to indices stack: %lu\n", index);
+		mapping->indices_stack[mapping->indices_stack_top - 1] = index;
+		mapping->indices_stack_top++;
+		// apic_send_IPI_allbutself(SPURIOUS_APIC_VECTOR);
+	}
 	return 0;
 error:
 	page->mapping = NULL;
@@ -1631,10 +1638,10 @@ static bool shmem_should_replace_page(struct page *page, gfp_t gfp)
 	return page_zonenum(page) > gfp_zone(gfp);
 }
 
-static int shmem_replace_page(struct page **pagep, gfp_t gfp,
-				struct shmem_inode_info *info, pgoff_t index)
+int shmem_replace_page(struct page **pagep, gfp_t gfp,
+				struct shmem_inode_info *info, pgoff_t index, struct page *newpage)
 {
-	struct page *oldpage, *newpage;
+	struct page *oldpage;
 	struct folio *old, *new;
 	struct address_space *swap_mapping;
 	swp_entry_t entry;
@@ -1651,7 +1658,8 @@ static int shmem_replace_page(struct page **pagep, gfp_t gfp,
 	 * limit chance of success by further cpuset and node constraints.
 	 */
 	gfp &= ~GFP_CONSTRAINT_MASK;
-	newpage = shmem_alloc_page(gfp, info, index);
+	if (newpage == NULL)
+		newpage = shmem_alloc_page(gfp, info, index);
 	if (!newpage)
 		return -ENOMEM;
 
@@ -1700,6 +1708,7 @@ static int shmem_replace_page(struct page **pagep, gfp_t gfp,
 	put_page(oldpage);
 	return error;
 }
+EXPORT_SYMBOL_GPL(shmem_replace_page);
 
 /*
  * Swap in the page pointed to by *pagep.
@@ -1760,7 +1769,7 @@ static int shmem_swapin_page(struct inode *inode, pgoff_t index,
 	arch_swap_restore(swap, page);
 
 	if (shmem_should_replace_page(page, gfp)) {
-		error = shmem_replace_page(&page, gfp, info, index);
+		error = shmem_replace_page(&page, gfp, info, index, NULL);
 		if (error)
 			goto failed;
 	}
@@ -3837,7 +3846,7 @@ static const struct super_operations shmem_ops = {
 #endif
 };
 
-static const struct vm_operations_struct shmem_vm_ops = {
+struct vm_operations_struct shmem_vm_ops = {
 	.fault		= shmem_fault,
 	.map_pages	= filemap_map_pages,
 #ifdef CONFIG_NUMA
@@ -3845,6 +3854,7 @@ static const struct vm_operations_struct shmem_vm_ops = {
 	.get_policy     = shmem_get_policy,
 #endif
 };
+EXPORT_SYMBOL_GPL(shmem_vm_ops);
 
 int shmem_init_fs_context(struct fs_context *fc)
 {

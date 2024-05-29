@@ -218,7 +218,7 @@ out:
 	return __pa(root->spt);
 }
 
-static void handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
+void handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
 				u64 old_spte, u64 new_spte, int level,
 				bool shared);
 
@@ -476,7 +476,7 @@ static void __handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
 				spte_to_child_pt(old_spte, level), shared);
 }
 
-static void handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
+void handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
 				u64 old_spte, u64 new_spte, int level,
 				bool shared)
 {
@@ -486,6 +486,7 @@ static void handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
 	handle_changed_spte_dirty_log(kvm, as_id, gfn, old_spte,
 				      new_spte, level);
 }
+EXPORT_SYMBOL_GPL(handle_changed_spte);
 
 /*
  * tdp_mmu_set_spte_atomic - Set a TDP MMU SPTE atomically
@@ -902,7 +903,7 @@ static int tdp_mmu_map_handle_target_level(struct kvm_vcpu *vcpu,
 	u64 new_spte;
 	int ret = RET_PF_FIXED;
 	bool wrprot = false;
-
+	// printk("tdp_mmu_map_handle_target_level\n");
 	WARN_ON(sp->role.level != fault->goal_level);
 	if (unlikely(!fault->slot))
 		new_spte = make_mmio_spte(vcpu, iter->gfn, ACC_ALL);
@@ -910,7 +911,6 @@ static int tdp_mmu_map_handle_target_level(struct kvm_vcpu *vcpu,
 		wrprot = make_spte(vcpu, sp, fault->slot, ACC_ALL, iter->gfn,
 					 fault->pfn, iter->old_spte, fault->prefetch, true,
 					 fault->map_writable, &new_spte);
-
 	if (new_spte == iter->old_spte)
 		ret = RET_PF_SPURIOUS;
 	else if (!tdp_mmu_set_spte_atomic(vcpu->kvm, iter, new_spte))
@@ -921,11 +921,12 @@ static int tdp_mmu_map_handle_target_level(struct kvm_vcpu *vcpu,
 	 * protected, emulation is needed. If the emulation was skipped,
 	 * the vCPU would have the same fault again.
 	 */
+	// printk("wrprot: %d, fault->write: %d\n", wrprot, fault->write);
 	if (wrprot) {
 		if (fault->write)
 			ret = RET_PF_EMULATE;
 	}
-
+	// printk("ret: %d\n", ret);
 	/* If a MMIO SPTE is installed, the MMIO will need to be emulated. */
 	if (unlikely(is_mmio_spte(new_spte))) {
 		trace_mark_mmio_spte(rcu_dereference(iter->sptep), iter->gfn,
@@ -935,6 +936,7 @@ static int tdp_mmu_map_handle_target_level(struct kvm_vcpu *vcpu,
 		trace_kvm_mmu_set_spte(iter->level, iter->gfn,
 				       rcu_dereference(iter->sptep));
 	}
+	// printk("ret: %d\n", ret);
 
 	/*
 	 * Increase pf_fixed in both RET_PF_EMULATE and RET_PF_FIXED to be
@@ -1499,6 +1501,7 @@ int kvm_tdp_mmu_get_walk(struct kvm_vcpu *vcpu, u64 addr, u64 *sptes,
 
 	return leaf;
 }
+EXPORT_SYMBOL_GPL(kvm_tdp_mmu_get_walk);
 
 /*
  * Returns the last level spte pointer of the shadow page walk for the given
@@ -1536,3 +1539,4 @@ u64 *kvm_tdp_mmu_fast_pf_get_last_sptep(struct kvm_vcpu *vcpu, u64 addr,
 	 */
 	return rcu_dereference(sptep);
 }
+EXPORT_SYMBOL_GPL(kvm_tdp_mmu_fast_pf_get_last_sptep);

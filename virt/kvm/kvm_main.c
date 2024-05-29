@@ -49,6 +49,7 @@
 #include <linux/sort.h>
 #include <linux/bsearch.h>
 #include <linux/io.h>
+#include <linux/io-64-nonatomic-lo-hi.h>
 #include <linux/lockdep.h>
 #include <linux/kthread.h>
 #include <linux/suspend.h>
@@ -403,7 +404,7 @@ void kvm_mmu_free_memory_cache(struct kvm_mmu_memory_cache *mc)
 
 void *kvm_mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
 {
-	void *p;
+	void *p;	
 
 	if (WARN_ON(!mc->nobjs))
 		p = mmu_memory_cache_alloc_obj(mc, GFP_ATOMIC | __GFP_ACCOUNT);
@@ -412,6 +413,7 @@ void *kvm_mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
 	BUG_ON(!p);
 	return p;
 }
+EXPORT_SYMBOL_GPL(kvm_mmu_memory_cache_alloc);
 #endif
 
 static void kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id)
@@ -1107,6 +1109,8 @@ static struct kvm *kvm_create_vm(unsigned long type)
 	preempt_notifier_inc();
 	kvm_init_pm_notifier(kvm);
 
+	// setup_bypass_memslots(kvm);
+
 	return kvm;
 
 out_err:
@@ -1791,13 +1795,78 @@ out_bitmap:
 }
 EXPORT_SYMBOL_GPL(__kvm_set_memory_region);
 
+extern u64 __iomem *ept_bypass_maps[N_BYPASS_MAPS];
+extern u32 hypervisor_pid;
+extern void setup_ept_hyperupcall_shmem_fault(struct vm_area_struct *vma, struct kvm_vcpu *vcpu);
+static void update_bypass_memslots(struct kvm *kvm) {
+	int i;
+	struct kvm_memslots *slots;
+	struct kvm_memory_slot *slot;
+	struct vm_area_struct *vma;
+	int huc_map_slot = 0;
+
+	if (ept_bypass_maps[MEMSLOTS_BASE_GFNS] == NULL || ept_bypass_maps[MEMSLOTS_NPAGES] == NULL || ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR] == NULL)
+		return;
+
+	// printk("update_bypass_memslots\n");
+	for (i = 0; i < 1; i++) {
+		slots = __kvm_memslots(kvm, i);
+		// printk("slots->used_slots=%d\n", slots->used_slots);
+		kvm_for_each_memslot(slot, slots) {
+			// printk("slot->id=%d->%d, i*64 = %d*64 = %d\n", slot->id, slot->id & 0b111111, i, i*64);
+			// printk("huc_map_slot=%d %p %p\n", huc_map_slot, slots, slot);
+			iowrite64(slot->base_gfn, &ept_bypass_maps[MEMSLOTS_BASE_GFNS][huc_map_slot]);
+			// printk("slot->base_gfn=%llx\n", slot->base_gfn);
+			iowrite64(slot->npages, &ept_bypass_maps[MEMSLOTS_NPAGES][huc_map_slot]);
+			// printk("slot->npages=%lx\n", slot->npages);
+			iowrite64(slot->userspace_addr, &ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][huc_map_slot]);
+			// printk("slot->userspace_addr=%lx\n", slot->userspace_addr);
+			mmap_read_lock(current->mm);
+			vma = find_vma(current->mm, slot->userspace_addr);
+			setup_ept_hyperupcall_shmem_fault(vma, kvm->vcpus[0]);
+			mmap_read_unlock(current->mm);
+			huc_map_slot++;
+		}
+	}
+	while (ioread64(&ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][huc_map_slot]) != 0) {
+		iowrite64(0, &ept_bypass_maps[MEMSLOTS_BASE_GFNS][huc_map_slot]);
+		iowrite64(0, &ept_bypass_maps[MEMSLOTS_NPAGES][huc_map_slot]);
+		iowrite64(0, &ept_bypass_maps[MEMSLOTS_USERSPACE_ADDR][huc_map_slot]);
+		huc_map_slot++;
+	}
+}
+
+void setup_bypass_memslots(struct kvm *kvm) {
+	if (ept_bypass_maps[MEMSLOTS_BASE_GFNS] == NULL || ept_bypass_maps[COUNTERS] == NULL)
+		return;
+	if (ioread64(&ept_bypass_maps[COUNTERS][QEMU_CR3]) == 0) {
+		hypervisor_pid = current->tgid;
+		iowrite64(read_cr3_pa(), &ept_bypass_maps[COUNTERS][QEMU_CR3]);
+	}
+	mutex_lock(&kvm->slots_lock);
+	update_bypass_memslots(kvm);
+	mutex_unlock(&kvm->slots_lock);
+}
+EXPORT_SYMBOL_GPL(setup_bypass_memslots);
+
 int kvm_set_memory_region(struct kvm *kvm,
 			  const struct kvm_userspace_memory_region *mem)
 {
 	int r;
+	// int i;
+	// struct kvm_memory_slot *memslot;
 
 	mutex_lock(&kvm->slots_lock);
 	r = __kvm_set_memory_region(kvm, mem);
+
+	update_bypass_memslots(kvm);
+
+	// printk(KERN_INFO "as_id=%d \n", mem->slot >> 16);
+	// for (i = 0; i < kvm->memslots[mem->slot >> 16]->used_slots; i++) {
+	// 	memslot = &kvm->memslots[mem->slot >> 16]->memslots[i];
+	// 	printk(KERN_INFO "memslot[%d]: base_gfn=%llx npages=%lx userspace_addr=%lx\n flags=%x\n",
+	// 		i, memslot->base_gfn, memslot->npages, memslot->userspace_addr, memslot->flags);
+	// }
 	mutex_unlock(&kvm->slots_lock);
 	return r;
 }
@@ -2164,7 +2233,7 @@ static unsigned long __gfn_to_hva_many(struct kvm_memory_slot *slot, gfn_t gfn,
 {
 	if (!slot || slot->flags & KVM_MEMSLOT_INVALID)
 		return KVM_HVA_ERR_BAD;
-
+	
 	if (memslot_is_readonly(slot) && write)
 		return KVM_HVA_ERR_RO_BAD;
 
@@ -3148,6 +3217,14 @@ update_halt_poll_stats(struct kvm_vcpu *vcpu, u64 poll_ns, bool waited)
 		vcpu->stat.generic.halt_poll_success_ns += poll_ns;
 }
 
+__attribute__((optimize("O0")))
+noinline u64 mark_vcpu_blocking(int vcpu_id)
+{
+	return 0;
+}
+ALLOW_ERROR_INJECTION(mark_vcpu_blocking, ERRNO);
+extern struct wait_queue_head direct_exe_wq[KVM_MAX_VCPUS];
+
 /*
  * The vCPU has executed a HLT instruction with in-kernel mode enabled.
  */
@@ -3156,6 +3233,7 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
 	ktime_t start, cur, poll_end;
 	bool waited = false;
 	u64 block_ns;
+	int r = 0, i = 0;
 
 	kvm_arch_vcpu_blocking(vcpu);
 
@@ -3193,7 +3271,14 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
 	prepare_to_rcuwait(&vcpu->wait);
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
-
+		r = mark_vcpu_blocking(vcpu->vcpu_id);
+		for (i  = 0; i < 32; i++) {
+			if ((r & (1 << i)) == 0 || i == vcpu->vcpu_id) {
+				continue;
+			}
+			wake_up_interruptible(&direct_exe_wq[i]);
+			// printk("waking up vcpu %d\n", i);
+		}
 		if (kvm_vcpu_check_block(vcpu) < 0)
 			break;
 
@@ -4302,12 +4387,13 @@ static long kvm_vm_ioctl(struct file *filp,
 	}
 	case KVM_SET_USER_MEMORY_REGION: {
 		struct kvm_userspace_memory_region kvm_userspace_mem;
-
+		
 		r = -EFAULT;
 		if (copy_from_user(&kvm_userspace_mem, argp,
 						sizeof(kvm_userspace_mem)))
 			goto out;
 
+		// printk("kvm_vm_ioctl: KVM_SET_USER_MEMORY_REGION slot: %d flags %d guest_phys %llx memory_size %llx userspace addr %llx\n", kvm_userspace_mem.slot, kvm_userspace_mem.flags, kvm_userspace_mem.guest_phys_addr, kvm_userspace_mem.memory_size, kvm_userspace_mem.userspace_addr);
 		r = kvm_vm_ioctl_set_memory_region(kvm, &kvm_userspace_mem);
 		break;
 	}

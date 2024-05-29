@@ -17,6 +17,7 @@
 #include <linux/error-injection.h>
 #include <linux/btf_ids.h>
 #include <linux/bpf_lsm.h>
+#include <linux/kvm_host.h>
 
 #include <net/bpf_sk_storage.h>
 
@@ -173,6 +174,81 @@ const struct bpf_func_proto bpf_probe_read_user_proto = {
 	.arg1_type	= ARG_PTR_TO_UNINIT_MEM,
 	.arg2_type	= ARG_CONST_SIZE_OR_ZERO,
 	.arg3_type	= ARG_ANYTHING,
+};
+
+// extern struct kvm_vcpu *kvm_get_running_vcpu(void);
+// extern unsigned long kvm_vcpu_gfn_to_hva(struct kvm_vcpu *vcpu, gfn_t gfn);
+
+volatile void __user *(*hyperupcall_pa_to_va)(unsigned long, int) = NULL;
+EXPORT_SYMBOL_GPL(hyperupcall_pa_to_va);
+
+BPF_CALL_3(bpf_probe_read_hyperupcall, void *, dst, u32, size,
+	   const void *, unsafe_ptr)
+{
+	const void __user * hva; 
+	// printk("In read hyperupcall!\n");
+	if (hyperupcall_pa_to_va == NULL) {
+		pr_err("hyperupcall_pa_to_va is NULL\n");
+		return -EINVAL;
+	}
+	// struct kvm_vcpu *vcpu = kvm_get_running_vcpu();
+	// hva = (const void __user *)(kvm_vcpu_gfn_to_hva(vcpu, ((unsigned long)unsafe_ptr) >> PAGE_SHIFT) + (((unsigned long)unsafe_ptr) & ~PAGE_MASK));
+	hva = (*hyperupcall_pa_to_va)((unsigned long)unsafe_ptr, size);
+	return bpf_probe_read_user_common(dst, size, hva);
+}
+
+const struct bpf_func_proto bpf_probe_read_hyperupcall_proto = {
+	.func		= bpf_probe_read_hyperupcall,
+	.gpl_only	= true,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_UNINIT_MEM,
+	.arg2_type	= ARG_CONST_SIZE_OR_ZERO,
+	.arg3_type	= ARG_ANYTHING,
+};
+
+BPF_CALL_3(bpf_probe_write_hyperupcall, void __user *, unsafe_ptr, const void *, src,
+	   u32, size)
+{
+	/*
+	 * Ensure we're in user context which is safe for the helper to
+	 * run. This helper has no business in a kthread.
+	 *
+	 * access_ok() should prevent writing to non-user memory, but in
+	 * some situations (nommu, temporary switch, etc) access_ok() does
+	 * not provide enough validation, hence the check on KERNEL_DS.
+	 *
+	 * nmi_uaccess_okay() ensures the probe is not run in an interim
+	 * state, when the task or mm are switched. This is specifically
+	 * required to prevent the use of temporary mm.
+	 */
+
+	void __user * hva; 
+	if (unlikely(in_interrupt() ||
+		     current->flags & (PF_KTHREAD | PF_EXITING)))
+		return -EPERM;
+	if (unlikely(uaccess_kernel()))
+		return -EPERM;
+	if (unlikely(!nmi_uaccess_okay()))
+		return -EPERM;
+
+	// printk("In read hyperupcall!\n");
+	if (hyperupcall_pa_to_va == NULL) {
+		pr_err("hyperupcall_pa_to_va is NULL\n");
+		return -EINVAL;
+	}
+	// struct kvm_vcpu *vcpu = kvm_get_running_vcpu();
+	// hva = (const void __user *)(kvm_vcpu_gfn_to_hva(vcpu, ((unsigned long)unsafe_ptr) >> PAGE_SHIFT) + (((unsigned long)unsafe_ptr) & ~PAGE_MASK));
+	hva = (*hyperupcall_pa_to_va)((unsigned long)unsafe_ptr, size);
+	return copy_to_user_nofault(hva, src, size);
+}
+
+static const struct bpf_func_proto bpf_probe_write_hyperupcall_proto = {
+	.func		= bpf_probe_write_hyperupcall,
+	.gpl_only	= true,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_ANYTHING,
+	.arg2_type	= ARG_PTR_TO_MEM,
+	.arg3_type	= ARG_CONST_SIZE,
 };
 
 static __always_inline int

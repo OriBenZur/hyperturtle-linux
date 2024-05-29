@@ -91,6 +91,52 @@
 #define KVM_PFN_ERR_HWPOISON	(KVM_PFN_ERR_MASK + 1)
 #define KVM_PFN_ERR_RO_FAULT	(KVM_PFN_ERR_MASK + 2)
 
+
+
+#define MAPS_DEV_OFFSET 5
+#define HYPERUPCALL_MAX_N_MEMSLOTS 128
+enum allocBypassMaps {
+	PFN_CACHE = 0,
+	COUNTERS,
+	MEMSLOTS_BASE_GFNS,
+	MEMSLOTS_NPAGES,
+	MEMSLOTS_USERSPACE_ADDR,
+	NO_MAP_LIST,
+	REMAP_LIST,
+	N_BYPASS_MAPS
+};
+
+enum counter_type {
+    BYPASS_ALLOCS_INDEX = 0,
+    BYPASS_ALLOC_ATTEMPS,
+    BYPASS_ALLOC_SUCCESS,
+    BYPASS_REMAP_SUCCESS,
+    BYPASS_ALLOC_FAILED_CACHE_EMPTY,
+    BYPASS_ALLOC_FAILED_CACHE_DIRTY_FULL,
+    BYPASS_ALLOC_FAILED_NO_MEMSLOT,
+    BYPASS_ALLOC_FAILED_CANT_REMAP_FAULT_READ,
+    BYPASS_ALLOC_FAILED_CANT_REMAP_GUEST_FLAGS,
+    BYPASS_ALLOC_FAILED_CANT_REMAP_NO_MAP_LIST,
+    BYPASS_ALLOC_FAILED_REACHED_MAX_ALLOCS,
+    BYPASS_ALLOC_FAILED_HYPERUPCALL_BUSY,
+    REMAP_UPDATE_SUCCESS0,
+    REMAP_UPDATE_SUCCESS1,
+    REMAP_UPDATE_SUCCESS2,
+    REMAP_UPDATE_SUCCESS3,
+    REMAP_UPDATE_SUCCESS4,
+    NO_MAP_HEAD,
+    NO_MAP_TAIL,
+    REMAP_MAP_HEAD,
+    REMAP_MAP_TAIL,
+    BYPASS_ALLOC_ENABLE,
+    QEMU_CR3,
+    PFN_CACHE_SIZE_KEY,
+    LOCK_FLAG1, // the hyperupcall's flag
+    LOCK_FLAG2,
+    LOCK_TURN,
+    N_COUNTERS
+};
+
 /*
  * error pfns indicate that the gfn is in slot but faild to
  * translate it to pfn on host.
@@ -825,7 +871,7 @@ enum kvm_mr_change {
 	KVM_MR_MOVE,
 	KVM_MR_FLAGS_ONLY,
 };
-
+void setup_bypass_memslots(struct kvm *kvm);
 int kvm_set_memory_region(struct kvm *kvm,
 			  const struct kvm_userspace_memory_region *mem);
 int __kvm_set_memory_region(struct kvm *kvm,
@@ -1245,10 +1291,10 @@ search_memslots(struct kvm_memslots *slots, gfn_t gfn, int *index)
 
 	if (unlikely(!slots->used_slots))
 		return NULL;
-
+	// printk("gfn: %llu", gfn);
 	while (start < end) {
 		int slot = start + (end - start) / 2;
-
+		// printk("memslots[slot].base_gfn: %llu, npages: %lu", memslots[slot].base_gfn, memslots[slot].npages);
 		if (gfn >= memslots[slot].base_gfn)
 			end = slot;
 		else
@@ -1299,6 +1345,7 @@ __gfn_to_hva_memslot(const struct kvm_memory_slot *slot, gfn_t gfn)
 	 */
 	unsigned long offset = gfn - slot->base_gfn;
 	offset = array_index_nospec(offset, slot->npages);
+	// printk("userspace_addr %lx; returning %lx\n", slot->userspace_addr, slot->userspace_addr + offset * PAGE_SIZE);
 	return slot->userspace_addr + offset * PAGE_SIZE;
 }
 
