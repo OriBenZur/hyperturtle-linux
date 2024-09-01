@@ -5844,6 +5844,7 @@ split_irqchip_unlock:
 		return r;
 	case KVM_CAP_EXIT_HYPERCALL:
 		if (cap->args[0] & ~KVM_EXIT_HYPERCALL_VALID_MASK) {
+            printk("INVLID Hyperupcall to exit\n");
 			r = -EINVAL;
 			break;
 		}
@@ -9048,6 +9049,17 @@ int kvm_emulate_hypercall(struct kvm_vcpu *vcpu)
 		ret = 0;
 		break;
 	}
+    /*
+     * Create new vDPA interface and hotplug it to the guest
+     * This operation is handled by the VMM.
+     */
+    case KVM_HC_CREATE_VDPA_AND_HOTPLUG:
+        vcpu->run->exit_reason = KVM_EXIT_HYPERCALL;
+        vcpu->run->hypercall.nr       = nr;
+        vcpu->run->hypercall.args[0]  = a0;
+        vcpu->run->hypercall.args[1]  = a1;
+        vcpu->arch.complete_userspace_io = complete_hypercall_exit;
+        return 0;
 	case KVM_HC_VAPIC_POLL_IRQ:
 		ret = 0;
 		break;
