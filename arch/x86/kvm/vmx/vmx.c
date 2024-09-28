@@ -8072,6 +8072,7 @@ static void vmx_cleanup_l1d_flush(void)
 // static spinlock_t bypass_lock;
 extern struct task_struct *bypass_alloc_task_struct;
 extern volatile void __user *(*hyperupcall_pa_to_va)(unsigned long, int);
+extern struct kvm_vcpu *(*get_running_vcpu)(void);
 
 extern int bypass_alloc_kthread(void *arg);
 
@@ -8104,6 +8105,7 @@ static void vmx_exit(void)
 		kthread_stop(bypass_alloc_task_struct);
 		bypass_alloc_task_struct = NULL;
 	}
+	get_running_vcpu = NULL;
 	hyperupcall_pa_to_va = NULL;
 	cleanup_ept_bypass_maps();
 	kvm_exit();
@@ -8227,6 +8229,7 @@ static int __init vmx_init(void)
 		}
 	}
 	hyperupcall_pa_to_va = &vmx_hyperupcall_pa_to_va;
+	get_running_vcpu = &kvm_get_running_vcpu;
 
 	return 0;
 }

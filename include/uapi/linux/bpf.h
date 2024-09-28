@@ -5121,7 +5121,7 @@ union bpf_attr {
 	FN(skc_to_unix_sock),		\
 	FN(kallsyms_lookup_name),	\
 	FN(bpf_probe_read_hyperupcall), \
-	// FN(bpf_probe_write_hyperupcall),
+	FN(bpf_probe_kvm_vcpu),		\
 	/* */
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper

@@ -1332,7 +1332,7 @@ const struct bpf_func_proto bpf_get_current_task_proto __weak;
 const struct bpf_func_proto bpf_get_current_task_btf_proto __weak;
 const struct bpf_func_proto bpf_probe_read_user_proto __weak;
 const struct bpf_func_proto bpf_probe_read_hyperupcall_proto __weak;
-// const struct bpf_func_proto bpf_probe_write_hyperupcall_proto __weak;
+const struct bpf_func_proto bpf_probe_kvm_vcpu_proto __weak;
 const struct bpf_func_proto bpf_probe_read_user_str_proto __weak;
 const struct bpf_func_proto bpf_probe_read_kernel_proto __weak;
 const struct bpf_func_proto bpf_probe_read_kernel_str_proto __weak;
@@ -1380,8 +1380,8 @@ bpf_base_func_proto(enum bpf_func_id func_id)
 		return &bpf_for_each_map_elem_proto;
 	case BPF_FUNC_bpf_probe_read_hyperupcall:
 		return &bpf_probe_read_hyperupcall_proto;
-	// case BPF_FUNC_bpf_probe_write_hyperupcall:
-	// 	return &bpf_probe_write_hyperupcall_proto;
+	case BPF_FUNC_bpf_probe_kvm_vcpu:
+		return &bpf_probe_kvm_vcpu_proto;
 	default:
 		break;
 	}

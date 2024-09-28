@@ -8951,7 +8951,6 @@ int kvm_emulate_hypercall(struct kvm_vcpu *vcpu)
 		vcpu->run->hypercall.nr       = nr;
 		vcpu->run->hypercall.args[0]  = binary;
 		vcpu->run->hypercall.args[1]  = program_len;
-		printk("Hello hypercall! %lu %llu %llu %llu\n", nr, binary, major_id, minor_id);
 
 		vcpu->arch.complete_userspace_io = complete_hypercall_exit;
 		return 0;
@@ -9853,6 +9852,12 @@ static noinline void ept_hyperupcall_add_page_to_pagecache(struct page *my_page,
 	r = add_to_page_cache_locked(my_page, mapping, index, mapping_gfp_mask(mapping));
 	if (r < 0) {
 		pr_err("add_to_page_cache_locked failed: %d\n", r);
+	}
+	if (my_page->mapping != mapping) {
+		pr_err("mapping not set correctly\n");
+	}
+	if (my_page->index != index) {
+		pr_err("index not set correctly\n");
 	}
 	// memcpy(page_to_virt(my_page), temp_page, 4096);
 }
