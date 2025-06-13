@@ -247,8 +247,46 @@ static const struct bpf_func_proto bpf_probe_write_hyperupcall_proto = {
 	.gpl_only	= true,
 	.ret_type	= RET_INTEGER,
 	.arg1_type	= ARG_ANYTHING,
-	.arg2_type	= ARG_PTR_TO_MEM,
+	.arg2_type	= ARG_PTR_TO_MEM, 
 	.arg3_type	= ARG_CONST_SIZE,
+};
+
+static __always_inline int
+bpf_probe_read_kernel_common(void *dst, u32 size, const void *unsafe_ptr)
+{
+	int ret;
+
+	ret = copy_from_kernel_nofault(dst, unsafe_ptr, size);
+	if (unlikely(ret < 0))
+		memset(dst, 0, size);
+	return ret;
+}
+
+struct kvm_vcpu *(*get_running_vcpu)(void) = NULL;
+EXPORT_SYMBOL_GPL(get_running_vcpu);
+
+BPF_CALL_2(bpf_probe_kvm_vcpu, void *, dst, u32, size)
+{
+	struct kvm_vcpu *vcpu;
+	unsigned int max_read_size;
+	if (get_running_vcpu == NULL)
+		return -EINVAL;
+
+	vcpu = get_running_vcpu();
+	max_read_size = sizeof(vcpu->arch.regs) > size ? size : sizeof(vcpu->arch.regs);
+	if (vcpu == NULL)
+		return -EINVAL;
+
+
+	return bpf_probe_read_kernel_common(dst, max_read_size, vcpu->arch.regs);
+}
+
+const struct bpf_func_proto bpf_probe_kvm_vcpu_proto = {
+	.func		= bpf_probe_kvm_vcpu,
+	.gpl_only	= true,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_UNINIT_MEM,
+	.arg2_type	= ARG_CONST_SIZE_OR_ZERO,
 };
 
 static __always_inline int
@@ -287,17 +325,6 @@ const struct bpf_func_proto bpf_probe_read_user_str_proto = {
 	.arg2_type	= ARG_CONST_SIZE_OR_ZERO,
 	.arg3_type	= ARG_ANYTHING,
 };
-
-static __always_inline int
-bpf_probe_read_kernel_common(void *dst, u32 size, const void *unsafe_ptr)
-{
-	int ret;
-
-	ret = copy_from_kernel_nofault(dst, unsafe_ptr, size);
-	if (unlikely(ret < 0))
-		memset(dst, 0, size);
-	return ret;
-}
 
 BPF_CALL_3(bpf_probe_read_kernel, void *, dst, u32, size,
 	   const void *, unsafe_ptr)
